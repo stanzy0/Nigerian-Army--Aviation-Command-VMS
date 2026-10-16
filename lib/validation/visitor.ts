@@ -35,6 +35,7 @@ export function validateStep2(data: {
   phone?: string
   nationality?: string
   gender?: string
+  photo_url?: string | null
 }): Record<string, string | null> {
   const errors: Record<string, string | null> = {}
 
@@ -56,6 +57,9 @@ export function validateStep2(data: {
 
   const genderErr = validateRequired(data.gender, 'Gender')
   if (genderErr) errors.gender = genderErr
+
+  const photoErr = validateRequired(data.photo_url, 'Visitor Photograph')
+  if (photoErr) errors.photo_url = photoErr
 
   return errors
 }

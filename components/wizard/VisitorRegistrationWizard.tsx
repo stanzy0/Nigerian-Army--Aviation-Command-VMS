@@ -100,6 +100,7 @@ export default function VisitorRegistrationWizard({ onComplete }: { onComplete?:
         phone: formData.phone,
         nationality: formData.nationality,
         gender: formData.gender,
+        photo_url: formData.photo_url,
       })
       if (formData.is_pre_arranged === null || formData.is_pre_arranged === undefined) {
         errors.is_pre_arranged = 'Please select whether this visit is pre-arranged.'
@@ -207,6 +208,13 @@ export default function VisitorRegistrationWizard({ onComplete }: { onComplete?:
       const user = await getCurrentUser()
       if (!user) {
         setError('You must be logged in to register visitors')
+        setSubmitting(false)
+        return
+      }
+
+      // Validate visitor photograph is present
+      if (!formData.photo_url) {
+        setError('Visitor photograph is required. Please capture or upload a photo.')
         setSubmitting(false)
         return
       }

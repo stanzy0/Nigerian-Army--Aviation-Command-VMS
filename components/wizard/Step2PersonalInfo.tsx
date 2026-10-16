@@ -32,12 +32,12 @@ export default function Step2PersonalInfo({ full_name = '', gender = '', phone =
       <h3 className="text-lg font-medium text-gray-900">Personal Information</h3>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Visitor Photograph</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Visitor Photograph *</label>
         <PhotoCapture
           value={photo_url || null}
           onChange={(dataUrl) => onChange('photo_url', dataUrl || '')}
           error={touched.has('photo_url') && errors.photo_url ? errors.photo_url : undefined}
-          required={false}
+          required={true}
         />
       </div>
 
