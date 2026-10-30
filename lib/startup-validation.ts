@@ -1,5 +1,10 @@
+import { isDemoMode } from '@/lib/demo'
+
 const REQUIRED_STARTUP_VARS = [
   'NEXT_PUBLIC_APP_URL',
+] as const
+
+const SUPABASE_VARS = [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
@@ -13,7 +18,10 @@ export function validateStartup(): { passed: boolean; error: string | null } {
   if (validationError) return { passed: false, error: validationError }
 
   const missing: string[] = []
-  for (const key of REQUIRED_STARTUP_VARS) {
+  const varsToCheck = isDemoMode()
+    ? REQUIRED_STARTUP_VARS
+    : [...REQUIRED_STARTUP_VARS, ...SUPABASE_VARS]
+  for (const key of varsToCheck) {
     if (!process.env[key]) {
       missing.push(key)
     }

@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VMS Admin - Visitors Management System",
-  description: "Admin dashboard for visitor management system",
+  title: "NA Avn Comd Visitor Management System",
+  description: "Admin dashboard for NA Avn Comd Visitor Management System",
 };
 
 export default function RootLayout({

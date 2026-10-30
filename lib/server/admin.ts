@@ -383,7 +383,7 @@ export async function getAllUsers(): Promise<AdminUser[]> {
 
   const { data, error } = await supabaseAdmin
     .from('user_roles')
-    .select('*, employee:employees(department,position,office_location)')
+    .select('*')
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(error.message)
@@ -391,7 +391,7 @@ export async function getAllUsers(): Promise<AdminUser[]> {
   const users = data || []
 
   // Fetch host assignments for users who have them
-  const userIds = users.map(u => u.user_id)
+  const userIds = users.map((u: { user_id: string }) => u.user_id)
   if (userIds.length > 0) {
     const { data: assignments, error: assignmentError } = await supabaseAdmin
       .from('user_host_assignments')
@@ -401,9 +401,9 @@ export async function getAllUsers(): Promise<AdminUser[]> {
     // Only merge assignments if the table exists and query succeeded
     if (!assignmentError && assignments) {
       const assignmentMap = new Map(
-        assignments.map(a => [a.user_id, { employee_id: a.employee_id, ...a.employee }])
+        assignments.map((a: { user_id: string; employee_id: string; employee?: { full_name?: string; position?: string; department?: string } }) => [a.user_id, { employee_id: a.employee_id, ...a.employee }])
       )
-      return users.map(user => ({
+      return users.map((user: { user_id: string }) => ({
         ...user,
         host_assignment: assignmentMap.get(user.user_id) || null,
       }))

@@ -291,10 +291,10 @@ export async function getSecurityReports(dateRange?: { start: string; end: strin
 
   const { data: activities } = await query
 
-  const approvals = (activities || []).filter((a) => a.decision === 'approved').length
-  const denials = (activities || []).filter((a) => a.decision === 'denied').length
-  const vehicleEntries = (activities || []).filter((a) => a.activity_type === 'vehicle_entry').length
-  const vehicleExits = (activities || []).filter((a) => a.activity_type === 'vehicle_exit').length
+  const approvals = (activities || []).filter((a: { decision: string }) => a.decision === 'approved').length
+  const denials = (activities || []).filter((a: { decision: string }) => a.decision === 'denied').length
+  const vehicleEntries = (activities || []).filter((a: { activity_type: string }) => a.activity_type === 'vehicle_entry').length
+  const vehicleExits = (activities || []).filter((a: { activity_type: string }) => a.activity_type === 'vehicle_exit').length
 
   return {
     approvals,

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isDemoMode } from '@/lib/demo'
 import { getCurrentUser } from '@/lib/auth'
+import { getVisits } from '@/lib/demo/mockData'
 import { sendEmail } from '@/lib/server/email'
 import { createHostNotification, createSystemNotification, createAdminNotification, createReceptionistNotification, createSecurityNotification, createPANotification, createPADirectorNotification } from '@/lib/server/notification-service'
 import { logAuditAction } from '@/lib/server/audit'
@@ -9,8 +11,20 @@ import { getSystemSetting } from '@/lib/server/settings'
 import { buildPortalQrUrl } from '@/lib/utils/portal-url'
 import { verifyBadgeQR } from '@/lib/qrcode-verification'
 import QRCode from 'qrcode'
+import { applyVisitStatusChange, type VisitStatus } from '@/lib/server/visit-status'
 
 export async function POST(request: NextRequest) {
+  if (isDemoMode()) {
+    const body = await request.json().catch(() => ({}))
+    const { visit_id, action } = body
+
+    if (!visit_id || !action) {
+      return NextResponse.json({ success: false, message: 'Missing required fields: visit_id and action are required', error: 'validation_error' }, { status: 400 })
+    }
+
+    return NextResponse.json({ success: true, demo: true, message: 'Demo mode: registration processed (not persisted)', data: { badge_number: 'DEMO-BADGE', qr_token: 'demo-token' } })
+  }
+
   const authResult = await requireRole(['Admin', 'Receptionist'])
   if (!authResult.authorized) {
     return NextResponse.json({ success: false, message: authResult.error, error: authResult.error }, { status: authResult.status })
@@ -23,6 +37,9 @@ export async function POST(request: NextRequest) {
     if (!visit_id || !action) {
       return NextResponse.json({ success: false, message: '', error: '' }, { status: 400 })
     }
+
+    const currentUser = await getCurrentUser()
+    const actorUserId = currentUser?.id ?? null
 
     if (!supabaseAdmin) {
       return NextResponse.json({ success: false, message: 'Server configuration error', error: 'Service role key not configured' }, { status: 500 })
@@ -40,6 +57,8 @@ export async function POST(request: NextRequest) {
 
     const visitor = Array.isArray(visit.visitor) ? visit.visitor[0] : visit.visitor
     const employee = Array.isArray(visit.employee) ? visit.employee[0] : visit.employee
+
+    const visitDate = visit.scheduled_date ? new Date(visit.scheduled_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
 
     if (action === 'approve') {
       const qrToken = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('')
@@ -80,13 +99,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: '' }, { status: 500 })
       }
 
-      const { error: updateError } = await supabaseAdmin
-        .from('visits')
-        .update({ status: 'approved' })
-        .eq('id', visit_id)
+      // Use the atomic status-change function for pending -> approved transition.
+      const result = await applyVisitStatusChange(visit_id, 'approved', {
+        auditAction: 'Public Registration Approved',
+        auditDetails: `Registration ${visit.registration_number} approved`,
+        approvedBy: actorUserId,
+      })
 
-      if (updateError) {
-        return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: '' }, { status: 500 })
+      if (result.outcome !== 'success') {
+        return NextResponse.json({ success: false, message: result.message, error: result.outcome }, { status: 409 })
       }
 
       const portalUrl = buildPortalQrUrl(badge.qr_token)
@@ -104,26 +125,26 @@ export async function POST(request: NextRequest) {
          })
        }
 
-        await sendEmail({
-          to: visitor?.email || '',
-        recipientName: visitor?.full_name || 'Visitor',
-        subject: `Registration Approved - ${visit.registration_number}`,
-        template: 'registration_approved',
-        data: {
-          visitorName: visitor?.full_name || 'Visitor',
-          registrationNumber: visit.registration_number,
-          date: visit.visit_date || new Date().toISOString().split('T')[0],
-          arrivalTime: visit.arrival_time || 'TBD',
-          hostName: employee?.full_name || 'Host',
-          location: employee?.office_location || 'Reception',
-          qrCodeUrl: qrDataUrl,
-          portalUrl: portalUrl,
-          badgeNumber: badge.badge_number,
-          orgName: 'Department of Land Warfare',
-        },
-        relatedType: 'visit',
-        relatedId: visit_id,
-      })
+       await sendEmail({
+         to: visitor?.email || '',
+         recipientName: visitor?.full_name || 'Visitor',
+         subject: `Registration Approved - ${visit.registration_number}`,
+         template: 'registration_approved',
+         data: {
+           visitorName: visitor?.full_name || 'Visitor',
+           registrationNumber: visit.registration_number,
+           date: visitDate,
+           arrivalTime: 'TBD',
+           hostName: employee?.full_name || 'Host',
+           location: employee?.office_location || 'Reception',
+           qrCodeUrl: qrDataUrl,
+           portalUrl: portalUrl,
+           badgeNumber: badge.badge_number,
+           orgName: 'Department of Land Warfare',
+         },
+         relatedType: 'visit',
+         relatedId: visit_id,
+       })
 
       if (employee?.email) {
         await sendEmail({
@@ -134,8 +155,8 @@ export async function POST(request: NextRequest) {
           data: {
             visitorName: visitor?.full_name || 'Visitor',
             registrationNumber: visit.registration_number,
-            date: visit.visit_date || new Date().toISOString().split('T')[0],
-            arrivalTime: visit.arrival_time || 'TBD',
+            date: visitDate,
+            arrivalTime: 'TBD',
             hostName: employee?.full_name || 'Host',
             location: employee?.office_location || 'Reception',
             purpose: visit.purpose || 'Visit',
@@ -195,13 +216,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'reject') {
-      const { error: updateError } = await supabaseAdmin
-        .from('visits')
-        .update({ status: 'rejected', rejection_reason: reason || null })
-        .eq('id', visit_id)
+      const result = await applyVisitStatusChange(visit_id, 'rejected', {
+        rejectionReason: reason || null,
+        auditAction: 'Public Registration Rejected',
+        auditDetails: `Registration ${visit.registration_number} rejected. Reason: ${reason || 'None'}`,
+        approvedBy: actorUserId,
+      })
 
-      if (updateError) {
-        return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: '' }, { status: 500 })
+      if (result.outcome !== 'success') {
+        return NextResponse.json({ success: false, message: result.message, error: result.outcome }, { status: 409 })
       }
 
       await sendEmail({
@@ -212,7 +235,7 @@ export async function POST(request: NextRequest) {
         data: {
           visitorName: visitor?.full_name || 'Visitor',
           registrationNumber: visit.registration_number,
-          date: visit.visit_date || new Date().toISOString().split('T')[0],
+          date: visitDate,
           hostName: employee?.full_name || 'Host',
           reason: reason || 'Not specified',
           orgName: 'Department of Land Warfare',
@@ -243,6 +266,11 @@ export async function GET(request: NextRequest) {
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ success: false, message: 'Unauthorized', error: '' }, { status: 401 })
+  }
+
+  if (isDemoMode()) {
+    const pendingVisits = getVisits().filter(v => v.status === 'pending')
+    return NextResponse.json({ success: true, demo: true, data: pendingVisits, message: 'Demo mode: synthetic registration data (not persisted)' })
   }
 
   if (!supabaseAdmin) {
@@ -359,7 +387,7 @@ export async function GET(request: NextRequest) {
           source: 'visitors query',
         },
         { status: 500 }
-       )
+      )
     }
 
     const { data: employees, error: employeesError } = employeeIds.length
@@ -404,8 +432,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const visitorsMap = new Map((visitors || []).map((v: any) => [v.id, v]))
-    const employeesMap = new Map((employees || []).map((e: any) => [e.id, e]))
+    const visitorsMap = new Map<string, any>((visitors || []).map((v: any) => [v.id, v]))
+    const employeesMap = new Map<string, any>((employees || []).map((e: any) => [e.id, e]))
 
     const enrichedVisits = visits.map((visit: any) => ({
       ...visit,

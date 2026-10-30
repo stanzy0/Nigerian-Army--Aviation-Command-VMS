@@ -258,17 +258,22 @@ export default function HostPortalPage() {
 
   const handleAdmitVisitor = async (visit: Visit) => {
     setActionLoading(visit.id)
-    const { error } = await supabase
-      .from('visits')
-      .update({ status: 'checked_in', check_in_time: new Date().toISOString() })
-      .eq('id', visit.id)
-
-    if (error) {
-      showNotification('error', error.message)
-    } else {
-      logAuditAction('Host Admitted Visitor', 'visit', visit.id, `${visit.visitor?.full_name} admitted by host`)
-      showNotification('success', 'Visitor admitted')
-      fetchData()
+    try {
+      const res = await fetch(`/api/visits/${visit.id}/status?id=${visit.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'checked_in' }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.success) {
+        showNotification('error', json.message || 'Failed to admit visitor')
+      } else {
+        logAuditAction('Host Admitted Visitor', 'visit', visit.id, `${visit.visitor?.full_name} admitted by host`)
+        showNotification('success', 'Visitor admitted')
+        fetchData()
+      }
+    } catch {
+      showNotification('error', 'Failed to admit visitor')
     }
     setActionLoading(null)
   }

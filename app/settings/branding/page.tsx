@@ -362,7 +362,7 @@ export default function BrandingSettingsPage() {
             onRemove={() => updateField('logo_url', null)}
             accept="image/png,image/jpeg,image/webp"
             path="institution-logo"
-            hint="Logo of the Armed Forces Command and Staff College"
+            hint="Logo of the NA Avn Comd"
           />
 
           <AssetField
@@ -448,5 +448,6 @@ export default function BrandingSettingsPage() {
     </div>
   )
 }
+
 
 

@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { isDemoMode } from '@/lib/demo'
 
 let startupValidated = false
 
@@ -12,6 +13,9 @@ export async function updateSession(request: NextRequest) {
     if (!result.passed && result.error) {
       console.error('[Startup Validation] Application startup blocked:', result.error)
     }
+  }
+  if (isDemoMode()) {
+    return NextResponse.next({ request })
   }
 
   const supabaseResponse = NextResponse.next({

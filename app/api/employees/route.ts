@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser, PERMISSIONS } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isDemoMode } from '@/lib/demo'
+import { getEmployees } from '@/lib/demo/mockData'
 import type { Employee, EmployeeFormData } from '@/lib/types/employee'
 
 export async function GET(request: NextRequest) {
+  if (isDemoMode()) {
+    const { searchParams } = new URL(request.url)
+    const search = searchParams.get('search')
+    let data = getEmployees()
+    if (search) {
+      const s = search.toLowerCase()
+      data = data.filter(e => e.full_name.toLowerCase().includes(s) || e.email.toLowerCase().includes(s) || e.department.toLowerCase().includes(s))
+    }
+    return NextResponse.json({ data })
+  }
   try {
     const user = await getCurrentUser()
     if (!user || !PERMISSIONS[user.role]?.includes('employees')) {

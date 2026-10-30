@@ -4,39 +4,47 @@ import { UserRole, UserWithRole, PERMISSIONS } from './auth-types'
 export { PERMISSIONS }
 export type { UserRole, UserWithRole }
 
+import { isDemoMode } from '@/lib/demo'
+
 export async function getCurrentUser(): Promise<UserWithRole | null> {
-  try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) return null
-
-    const { data: userRole, error } = await supabase
-      .from('user_roles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
-
-    if (error || !userRole) {
-      return {
-        id: user.id,
-        email: user.email || '',
-        full_name: null,
-        role: 'Receptionist' as UserRole,
-        created_at: null,
-      }
+  if (isDemoMode()) {
+    return {
+      id: 'demo-admin',
+      email: 'demo.admin@local',
+      full_name: 'Demo Admin (Sample)',
+      role: 'Admin' as UserRole,
+      created_at: new Date().toISOString(),
+      must_change_password: false,
     }
+  }
+
+  try {
+    const res = await fetch('/api/auth/me', {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 404) {
+        return null
+      }
+      console.error('[getCurrentUser] API error:', await res.text())
+      return null
+    }
+
+    const { data } = await res.json()
+    if (!data) return null
 
     return {
-      id: user.id,
-      email: user.email || '',
-      full_name: userRole.full_name,
-      role: userRole.role as UserRole,
-      created_at: userRole.created_at,
-      must_change_password: userRole.must_change_password ?? false,
+      id: data.id,
+      email: data.email,
+      full_name: data.full_name,
+      role: data.role as UserRole,
+      created_at: data.created_at,
+      must_change_password: data.must_change_password ?? false,
     }
-  } catch {
+  } catch (err) {
+    console.error('[getCurrentUser] Network error:', err)
     return null
   }
 }

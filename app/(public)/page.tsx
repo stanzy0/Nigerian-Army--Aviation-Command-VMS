@@ -68,7 +68,7 @@ export default function PublicLandingPage() {
       .then(json => {
         if (cancelled || !json?.data) return
         setBranding({
-          college_name: json.data.college_name || 'Department of Land Warfare',
+          college_name: json.data.college_name || 'Nigerian Army Aviation Command',
           logo_url: json.data.logo_url,
           department_logo_url: json.data.department_logo_url,
           primary_color: json.data.primary_color || '#4B5320',
@@ -83,8 +83,8 @@ export default function PublicLandingPage() {
   const primaryColor = branding?.primary_color || '#4B5320'
   const secondaryColor = branding?.secondary_color || '#556B2F'
   const accentColor = branding?.accent_color || '#C8A646'
-  const institutionLogo = branding?.logo_url || '/images/afcsc-logo.png'
-  const collegeName = branding?.college_name || 'Department of Land Warfare'
+  const institutionLogo = '/images/army logo.png'
+  const collegeName = branding?.college_name || 'Nigerian Army Aviation Command'
   const year = new Date().getFullYear()
 
   return (
@@ -105,7 +105,7 @@ export default function PublicLandingPage() {
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded border border-[rgba(200,166,70,0.25)] bg-[rgba(200,166,70,0.05)] mb-6">
                   <div className="h-1.5 w-1.5 rounded-full bg-[#C8A646]" />
                   <span className="text-[10px] font-bold uppercase tracking-widest text-[#C8A646]">
-                    Armed Forces Command and Staff College
+                    Nigerian Army Aviation Command
                   </span>
                 </div>
 
@@ -114,7 +114,7 @@ export default function PublicLandingPage() {
                 </h1>
 
                 <p className="mt-3 text-xs sm:text-sm font-semibold uppercase tracking-widest text-[#9A9F87]">
-                  Department of Land Warfare
+                  Nigerian Army Aviation Command Visitor Management System
                 </p>
 
                 <p className="mt-4 text-lg sm:text-xl font-semibold text-[#C8A646] tracking-wide">
@@ -198,7 +198,7 @@ export default function PublicLandingPage() {
             <div className="max-w-3xl mx-auto text-center">
               <h2 className="text-xl sm:text-2xl font-bold text-[#F5F5DC] tracking-tight">About the Visitor Management System</h2>
               <p className="mt-4 text-sm sm:text-base text-[#9A9F87] leading-relaxed">
-                The Visitor Management System (VMS) is an integrated platform designed for the Department of Land Warfare. It provides secure visitor registration, host verification, access control, and real-time monitoring to maintain institutional security and accountability.
+                The Visitor Management System (VMS) is an integrated platform designed for the Nigerian Army Aviation Command Visitor Management System. It provides secure visitor registration, host verification, access control, and real-time monitoring to maintain institutional security and accountability.
               </p>
             </div>
           </div>
@@ -211,7 +211,7 @@ export default function PublicLandingPage() {
             <div className="text-center mb-10">
               <h2 className="text-xl sm:text-2xl font-bold text-[#F5F5DC] tracking-tight">Campus Gallery</h2>
                 <p className="mt-2 text-sm text-[#9A9F87] max-w-2xl mx-auto">
-                  A glimpse of AFCSC and DLW facilities.
+                  A glimpse of Nigerian Army Aviation Command facilities.
                 </p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -388,21 +388,15 @@ export default function PublicLandingPage() {
             <div className="flex items-center gap-4">
               <ImageWithFallback
                 src={institutionLogo}
-                alt="Armed Forces Command and Staff College Logo"
-                className="h-10 w-10 sm:h-12 sm:w-12 object-contain"
-              />
-              <div className="h-8 w-px bg-[rgba(85,107,47,0.4)]" />
-              <ImageWithFallback
-                src="/images/army logo.png"
-                alt="Department of Land Warfare Logo"
+                alt="Nigerian Army Aviation Command Logo"
                 className="h-10 w-10 sm:h-12 sm:w-12 object-contain"
               />
             </div>
 
             <div className="space-y-1">
-              <p className="text-sm font-bold text-[#F5F5DC] uppercase tracking-wider">DLW Visitor Management</p>
-              <p className="text-xs text-[#9A9F87]">Department of Land Warfare</p>
-              <p className="text-xs text-[#9A9F87]">Armed Forces Command and Staff College</p>
+              <p className="text-sm font-bold text-[#F5F5DC] uppercase tracking-wider">Nigerian Army Aviation Command Visitor Management</p>
+              <p className="text-xs text-[#9A9F87]">Nigerian Army Aviation Command Visitor Management System</p>
+              <p className="text-xs text-[#9A9F87]">Nigerian Army Aviation Command</p>
             </div>
 
             <div className="flex items-center gap-6">
@@ -424,7 +418,7 @@ export default function PublicLandingPage() {
             </div>
 
             <div className="pt-6 border-t border-[rgba(85,107,47,0.2)] w-full">
-              <p className="text-[10px] text-[#9A9F87]">&copy; {year} Armed Forces Command and Staff College. All Rights Reserved.</p>
+              <p className="text-[10px] text-[#9A9F87]">&copy; {year} Nigerian Army Aviation Command. All Rights Reserved.</p>
               <p className="text-[10px] font-semibold text-[#C8A646] uppercase tracking-wider mt-1">Authorized Access Only</p>
             </div>
           </div>

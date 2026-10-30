@@ -3,28 +3,31 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
+import { isDemoMode } from '@/lib/demo'
+
 export function useNotificationRealtime(onNewNotification?: () => void) {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const callbackRef = useRef(onNewNotification)
 
   useEffect(() => {
+    if (isDemoMode()) return
     callbackRef.current = onNewNotification
   }, [onNewNotification])
 
   useEffect(() => {
+    if (isDemoMode()) return
     if (!supabase) return
 
     const setupRealtime = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .single()
+      // Fetch role via server-side API to bypass RLS issues
+      const roleRes = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' })
+      const roleData = roleRes.ok ? await roleRes.json() : { success: false }
+      const role = roleData.success ? roleData.data?.role : null
 
-      const role = userRole?.role
+      if (!role) return
 
       channelRef.current = supabase
         .channel('notifications')

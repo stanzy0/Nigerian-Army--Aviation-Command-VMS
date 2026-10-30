@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getNotifications, getNotificationStats, getUnreadCount, markAsRead, markAllAsRead, deleteNotification, deleteReadNotifications, createNotification } from '@/lib/server/notification-service'
 import { getCurrentUser } from '@/lib/auth'
+import { isDemoMode } from '@/lib/demo'
 
 export async function GET(request: NextRequest) {
+  if (isDemoMode()) {
+    return NextResponse.json({ success: true, data: [], total: 0, page: 1, limit: 20, totalPages: 0, stats: { total: 0, unread: 0, info: 0, warning: 0, success: 0, error: 0 }, unreadCount: 0 })
+  }
   try {
     const user = await getCurrentUser()
     if (!user) {

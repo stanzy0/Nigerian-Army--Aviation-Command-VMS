@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { useNotificationRealtime } from '@/hooks/useNotificationRealtime'
 import type { Notification, NotificationFilters } from '@/lib/types/notification'
 import { getAuthHeaders } from '@/lib/client/api'
+import { isDemoMode } from '@/lib/demo'
 import { supabase } from '@/lib/supabase'
 
 interface NotificationContextValue {
@@ -99,6 +100,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     const init = async () => {
+      if (isDemoMode()) {
+        setLoading(false)
+        return
+      }
       const { data: { user } } = await supabase.auth.getUser()
       if (!cancelled && user) {
         await fetchNotifications()

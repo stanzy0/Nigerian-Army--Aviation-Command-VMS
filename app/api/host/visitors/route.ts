@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
+import { isDemoMode } from '@/lib/demo'
 import { getHostVisitors, approveVisitor, rejectVisitor } from '@/lib/server/host'
 
 export async function GET(request: NextRequest) {
@@ -31,6 +32,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { visitId, action, reason } = body
+
+    if (isDemoMode()) {
+      return NextResponse.json({ success: true, data: { id: visitId, status: action === 'approve' ? 'approved' : 'rejected' } })
+    }
 
     const employeeId = request.headers.get('x-employee-id') || 'default'
 

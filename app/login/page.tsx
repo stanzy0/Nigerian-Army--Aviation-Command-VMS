@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { isDemoMode } from '@/lib/demo'
 import { createClient } from '@/lib/supabase/client'
 import { ensureUserInDatabase } from '@/lib/auth-client'
 import { logAuditAction } from '@/lib/client/audit'
@@ -32,6 +33,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     const checkRememberedDevice = async () => {
+      if (isDemoMode()) return
       try {
         const user = await createClient().auth.getUser()
         if (user.data.user) {
@@ -61,7 +63,7 @@ export default function LoginPage() {
             primary_color: data.primary_color || '#4B5320',
             secondary_color: data.secondary_color || '#556B2F',
             accent_color: data.accent_color || '#C8A646',
-             college_name: data.college_name || 'Department of Land Warfare',
+             college_name: data.college_name || 'Nigerian Army Aviation Command',
           })
         }
       } catch {
@@ -99,6 +101,12 @@ export default function LoginPage() {
 
     setLoading(true)
 
+    if (isDemoMode()) {
+      setLoading(false)
+      window.location.href = '/dashboard'
+      return
+    }
+
     try {
       const supabase = createClient()
       const normalizedEmail = email.trim().toLowerCase()
@@ -134,13 +142,9 @@ export default function LoginPage() {
         return
       }
 
-      const { data: userRole } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', data.user.id)
-        .single()
-
-      const role = userRole?.role
+      const roleRes = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' })
+      const roleData = roleRes.ok ? await roleRes.json() : { success: false }
+      const role = roleData.success ? roleData.data?.role : null
       if (role === 'PA_TO_CI') {
         window.location.href = '/pa-ci'
       } else if (role === 'PA_TO_DIRECTOR') {
@@ -168,7 +172,7 @@ export default function LoginPage() {
   const secondaryColor = branding?.secondary_color || '#556B2F'
   const accentColor = branding?.accent_color || '#C8A646'
   const loginBg = branding?.login_background_url || '/images/afcsc-login.jpg'
-  const collegeName = branding?.college_name || 'Department of Land Warfare'
+  const collegeName = branding?.college_name || 'Nigerian Army Aviation Command'
 
   return (
     <div className="flex flex-col lg:flex-row h-screen w-screen overflow-hidden bg-[#0B0F08]">
@@ -192,24 +196,19 @@ export default function LoginPage() {
           <div className="w-full p-6 sm:p-8 lg:p-10">
             <div className="flex items-center gap-3 mb-4">
               <ImageWithFallback
-                src={branding?.logo_url || '/images/afcsc-logo.png'}
-                alt="Armed Forces Command and Staff College Logo"
-                className="h-9 w-9 sm:h-10 sm:w-10 object-contain"
-              />
-              <ImageWithFallback
                 src="/images/army logo.png"
-                alt="Department of Land Warfare Logo"
+                alt="Nigerian Army Aviation Command Logo"
                 className="h-9 w-9 sm:h-10 sm:w-10 object-contain"
               />
             </div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight">
-DLW Visitor Management
+Nigerian Army Aviation Command Visitor Management
             </h1>
             <p className="text-xs sm:text-sm text-white/80 mt-1 max-w-md">
               Secure Visitor Registration &amp; Access Management
             </p>
             <p className="text-[10px] sm:text-xs text-white/60 mt-1">
-              Department of Land Warfare
+              Nigerian Army Aviation Command
             </p>
           </div>
         </div>
@@ -235,7 +234,7 @@ DLW Visitor Management
               />
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-[#F5F5DC]">Sign in to continue</h2>
-            <p className="text-sm text-[#9A9F87] mt-1">Access the DLW Visitor Management System</p>
+            <p className="text-sm text-[#9A9F87] mt-1">Access the Nigerian Army Aviation Command Visitor Management System</p>
           </div>
 
           {error && (
@@ -400,3 +399,4 @@ DLW Visitor Management
     </div>
   )
 }
+

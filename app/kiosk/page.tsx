@@ -1,5 +1,6 @@
 'use client'
 
+import type { Html5Qrcode } from 'html5-qrcode'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Loader2, CheckCircle2, XCircle, Search, QrCode, Keyboard, Clock, MapPin, UserCheck, Printer, ShieldCheck, AlertCircle, ChevronRight, Home, Settings, Camera, X } from 'lucide-react'
@@ -55,8 +56,8 @@ export default function KioskPage() {
   const [showSettings, setShowSettings] = useState(false)
 
   const inactivityTimer = useRef<NodeJS.Timeout | null>(null)
-  const qrScannerRef = useRef<any>(null)
-  const html5QrCodeRef = useRef<any>(null)
+  const qrScannerRef = useRef<HTMLDivElement | null>(null)
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null)
 
   const resetInactivityTimer = useCallback(() => {
     if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
@@ -109,7 +110,7 @@ export default function KioskPage() {
 
   const lookupByRegistration = async () => {
     if (!registrationNumber.trim()) {
-      showMessage('error', 'Please enter a registration number')
+      showMessage('error', 'Please enter a badge QR token or credential')
       return
     }
 
@@ -125,34 +126,29 @@ export default function KioskPage() {
           registration_number: visitData.registration_number,
           status: visitData.status,
           purpose: '',
-          created_at: '',
+          created_at: visitData.visit_date || '',
           check_in_time: visitData.check_in_time,
           visitor: {
-            full_name: visitData.visitor_name,
+            full_name: 'Visitor',
             phone: null,
             email: null,
             visitor_organization: null,
             photo_url: null,
           },
           employee: {
-            full_name: visitData.host_name,
-            department: visitData.department,
-            office_location: visitData.office_location,
+            full_name: 'N/A',
+            department: 'N/A',
+            office_location: 'N/A',
           },
-          badge: visitData.badge_number ? {
-            badge_number: visitData.badge_number,
-            badge_status: 'Active',
-            qr_token: visitData.qr_token,
-            expires_at: null,
-          } : null,
+          badge: null,
         }
         setVisit(mappedVisit)
         setScreen('confirmation')
       } else {
-        showMessage('error', data.error || 'Registration not found')
+        showMessage('error', data.error || 'Invalid credential')
       }
     } catch {
-      showMessage('error', 'Failed to look up registration')
+      showMessage('error', 'Failed to look up status')
     } finally {
       setLoading(false)
     }
@@ -226,39 +222,34 @@ export default function KioskPage() {
           console.log('QR STATUS RESPONSE:', { status: res.status, ok: res.ok, data })
 
           if (res.ok && data.data) {
-        const visitData = data.data
-        const mappedVisit: Visit = {
-          id: visitData.registration_number,
-          registration_number: visitData.registration_number,
-          status: visitData.status,
-          purpose: '',
-          created_at: '',
-          check_in_time: visitData.check_in_time,
-          visitor: {
-            full_name: visitData.visitor_name,
-            phone: null,
-            email: null,
-            visitor_organization: null,
-            photo_url: null,
-          },
-          employee: {
-            full_name: visitData.host_name,
-            department: visitData.department,
-            office_location: visitData.office_location,
-          },
-          badge: visitData.badge_number ? {
-            badge_number: visitData.badge_number,
-            badge_status: 'Active',
-            qr_token: visitData.qr_token,
-            expires_at: null,
-          } : null,
-        }
-        setVisit(mappedVisit)
-        setScreen('confirmation')
-      } else {
-        showMessage('error', data.error || 'QR code not recognized')
-        setScreen('welcome')
-      }
+            const visitData = data.data
+            const mappedVisit: Visit = {
+              id: visitData.registration_number,
+              registration_number: visitData.registration_number,
+              status: visitData.status,
+              purpose: '',
+              created_at: visitData.visit_date || '',
+              check_in_time: visitData.check_in_time,
+              visitor: {
+                full_name: 'Visitor',
+                phone: null,
+                email: null,
+                visitor_organization: null,
+                photo_url: null,
+              },
+              employee: {
+                full_name: 'N/A',
+                department: 'N/A',
+                office_location: 'N/A',
+              },
+              badge: null,
+            }
+            setVisit(mappedVisit)
+            setScreen('confirmation')
+          } else {
+            showMessage('error', data.error || 'QR code not recognized')
+            setScreen('welcome')
+          }
     } catch {
       showMessage('error', 'Failed to process QR code')
       setScreen('welcome')
@@ -277,7 +268,7 @@ export default function KioskPage() {
       const res = await fetch('/api/public/kiosk-checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ visit_id: visit.id }),
+        body: JSON.stringify({ qr_token: visit.badge?.qr_token }),
       })
 
       const data = await res.json()
@@ -367,7 +358,7 @@ export default function KioskPage() {
       {screen === 'welcome' && (
         <div className="flex flex-col items-center justify-center min-h-screen p-6">
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold text-[#F5F5DC] mb-4">Armed Forces Command and Staff College</h1>
+            <h1 className="text-4xl md:text-5xl font-bold text-[#F5F5DC] mb-4">Nigerian Army Aviation Command</h1>
             <p className="text-2xl text-[#9A9F87] font-medium">Visitor Self Check-In</p>
           </div>
 
@@ -711,5 +702,6 @@ export default function KioskPage() {
     </div>
   )
 }
+
 
 

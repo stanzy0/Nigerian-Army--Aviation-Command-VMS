@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data: [] })
   }
 
-  const visitorIds = [...new Set(visits.map(v => v.visitor_id).filter(Boolean))]
+  const visitorIds = [...new Set(visits.map((v: { visitor_id: string }) => v.visitor_id).filter(Boolean))]
 
   const { data: visitors, error: visitorsError } = await supabaseAdmin
     .from('visitors')

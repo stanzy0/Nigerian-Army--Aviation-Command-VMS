@@ -1,12 +1,26 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { requireAdmin } from '@/lib/auth-helpers'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isDemoMode } from '@/lib/demo'
 import { sendEmail } from '@/lib/server/email'
 import { buildPortalQrUrl } from '@/lib/utils/portal-url'
 import { verifyBadgeQR } from '@/lib/qrcode-verification'
 import QRCode from 'qrcode'
 
 export async function GET(request: NextRequest) {
+  if (isDemoMode()) {
+    return NextResponse.json({
+      success: true,
+      demo: true,
+      message: 'Demo mode: badge data not persisted (synthetic response)',
+      data: [],
+      total: 0,
+      page: 1,
+      limit: 20,
+      totalPages: 0,
+    }, { status: 200 })
+  }
+
   const authResult = await requireAdmin()
   if (!authResult.authorized) {
     return NextResponse.json({ success: false, message: authResult.error, error: authResult.error }, { status: authResult.status })
@@ -43,8 +57,9 @@ export async function GET(request: NextRequest) {
      const { data, error, count } = await query
 
      if (error) {
-       return NextResponse.json({ success: false, message: 'Failed to fetch badges', error: 'Internal server error' }, { status: 500 })
-    }
+       console.error('[GET /api/badges] error:', error)
+       return NextResponse.json({ success: false, message: error.message || 'Failed to fetch badges', error: error.message || 'Internal server error' }, { status: 500 })
+     }
 
     return NextResponse.json({
       data: data || [],
@@ -60,11 +75,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireAdmin()
-  if (!authResult.authorized) {
-    return NextResponse.json({ success: false, message: authResult.error, error: authResult.error }, { status: authResult.status })
-  }
-
   try {
     const body = await request.json()
 
@@ -72,6 +82,30 @@ export async function POST(request: NextRequest) {
 
     if (!visit_id) {
       return NextResponse.json({ success: false, message: '', error: '' }, { status: 400 })
+    }
+
+    if (isDemoMode()) {
+      return NextResponse.json({
+        success: true,
+        demo: true,
+        message: 'Demo mode: badge created (not persisted)',
+        data: {
+          id: `demo-badge-${Date.now()}`,
+          visit_id,
+          badge_number: 'DEMO-BADGE',
+          qr_token: 'demo-token',
+          badge_status: 'Active',
+          expires_at: new Date(Date.now() + 86400000).toISOString(),
+          issued_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      }, { status: 201 })
+    }
+
+    const authResult = await requireAdmin()
+    if (!authResult.authorized) {
+      return NextResponse.json({ success: false, message: authResult.error, error: authResult.error }, { status: authResult.status })
     }
 
     if (!supabaseAdmin) {

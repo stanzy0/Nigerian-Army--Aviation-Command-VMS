@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { isDemoMode } from '@/lib/demo'
+import { getVisits as getDemoVisits } from '@/lib/demo/mockData'
 import { logAuditAction } from '@/lib/client/audit'
 import { getAuthHeaders } from '@/lib/client/api'
 import { Search, Loader2, CheckCircle, XCircle, LogIn, LogOut, QrCode, Eye, Printer, RefreshCw, X } from 'lucide-react'
@@ -58,6 +60,8 @@ export default function VisitsPage() {
   }
 
   function setupRealtime() {
+    if (isDemoMode()) return
+
     if (realtimeChannel.current) {
       supabase.removeChannel(realtimeChannel.current)
     }
@@ -85,128 +89,19 @@ export default function VisitsPage() {
     setError(null)
 
     try {
-      const { data, error } = await supabase
-        .from('visits')
-        .select(`
-          *,
-          visitor:visitors(
-            full_name,
-            visitor_organization,
-            photo_url,
-            doc_type,
-            doc_number,
-            doc_front_url,
-            doc_back_url
-          ),
-          employee:employees(full_name, department, office_location)
-        `)
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Failed to load visits:', error)
-        setError(error.message)
+      if (isDemoMode()) {
+        const demoData = getDemoVisits()
+        setVisits(demoData as Visit[])
         setLoading(false)
         return
       }
 
-      if (!data || data.length === 0) {
-        setVisits([])
-        setLoading(false)
-        return
+      const res = await fetch('/api/visits')
+      if (!res.ok) {
+        throw new Error(`Failed to fetch visits: ${res.status}`)
       }
-
-      const visitIds = data.map(v => v.id)
-      let badges: Array<{
-        id: string
-        visit_id: string
-        badge_number: string
-        badge_status: string
-        qr_token: string
-        issued_at: string
-        expires_at: string
-        printed_at: string | null
-        printed_by: string | null
-        reprint_count: number
-        created_at: string
-        updated_at: string
-        visit: {
-          id: string
-          visitor: { full_name: string; visitor_organization: string; photo_url?: string | null } | null
-          employee: { full_name: string; department: string } | null
-          purpose: string
-          check_in_time: string | null
-          check_out_time: string | null
-        } | null
-      }> = []
-
-      if (visitIds.length > 0) {
-        try {
-          const result = await supabase
-            .from('visitor_badges')
-            .select(`
-              id,
-              visit_id,
-              badge_number,
-              badge_status,
-              qr_token,
-              issued_at,
-              expires_at,
-              printed_at,
-              printed_by,
-              reprint_count,
-              created_at,
-              updated_at,
-              visit:visits(
-                id,
-                visitor:visitors(full_name, visitor_organization, photo_url),
-                employee:employees(full_name, department),
-                purpose,
-                check_in_time,
-                check_out_time
-              )
-            `)
-            .in('visit_id', visitIds)
-
-          if (result.data) {
-            const rawBadges = result.data || []
-            badges = rawBadges.map((b: Record<string, unknown>) => ({
-              ...b,
-              visit: Array.isArray(b.visit) ? b.visit[0] : b.visit,
-            })) as Array<{
-              id: string
-              visit_id: string
-              badge_number: string
-              badge_status: string
-              qr_token: string
-              issued_at: string
-              expires_at: string
-              printed_at: string | null
-              printed_by: string | null
-              reprint_count: number
-              created_at: string
-              updated_at: string
-              visit: {
-                id: string
-                visitor: { full_name: string; visitor_organization: string; photo_url?: string | null } | null
-                employee: { full_name: string; department: string } | null
-                purpose: string
-                check_in_time: string | null
-                check_out_time: string | null
-              } | null
-            }>
-          }
-        } catch (badgeError) {
-          console.error('Failed to load badges:', badgeError)
-        }
-      }
-
-      const badgesByVisitId = new Map(badges.map(b => [b.visit_id, b]))
-      const visitsWithBadges = data.map(v => ({
-        ...v,
-        badge: badgesByVisitId.get(v.id) || null,
-      }))
-
-      setVisits(visitsWithBadges)
+      const result = await res.json()
+      setVisits(result.data || [])
       setLoading(false)
     } catch (err) {
       console.error('Failed to load visits:', err)
@@ -233,7 +128,7 @@ export default function VisitsPage() {
     checkAuth()
 
     return () => {
-      if (realtimeChannel.current) {
+      if (!isDemoMode() && realtimeChannel.current) {
         supabase.removeChannel(realtimeChannel.current)
       }
     }
@@ -348,7 +243,7 @@ const statusStyles: Record<string, string> = {
       <div className="absolute inset-0 z-0">
         <img
           src="/images/afcsc-login.jpg"
-          alt="Armed Forces Command and Staff College background"
+          alt="Nigerian Army Aviation Command background"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F08]/90 via-[#0B0F08]/70 to-[#0B0F08]/40" />
@@ -605,4 +500,5 @@ const statusStyles: Record<string, string> = {
     </div>
   )
 }
+
 

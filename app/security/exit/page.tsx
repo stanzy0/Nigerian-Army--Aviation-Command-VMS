@@ -388,12 +388,25 @@ export default function ExitControlPage() {
     try {
       const now = new Date().toISOString()
       const { transitionVisitStatus } = await import('@/lib/server/lifecycle')
-      await transitionVisitStatus(selectedVisit.id, 'checked_out', null, { method: 'security_exit' })
+      try {
+        await transitionVisitStatus(selectedVisit.id, 'checked_out', null, { method: 'security_exit' })
+      } catch {
+        // Lifecycle server call may be unavailable in demo mode.
+      }
 
-      await supabase.from('visits').update({
-        status: 'checked_out',
-        check_out_time: now,
-      }).eq('id', selectedVisit.id)
+      // Use the authorized API route for status change instead of a direct client-side DB update.
+      const checkOutRes = await fetch(`/api/visits/status?id=${encodeURIComponent(selectedVisit.id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'checked_out' }),
+      })
+
+      if (!checkOutRes.ok) {
+        const errData = await checkOutRes.json().catch(() => ({}))
+        console.error('Check-out failed:', errData.message || 'Unknown error')
+        setProcessing(false)
+        return
+      }
 
       if (selectedVisit.badge?.id) {
         await supabase.from('visitor_badges').update({

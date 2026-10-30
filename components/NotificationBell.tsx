@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Bell } from 'lucide-react'
+import { isDemoMode } from '@/lib/demo'
 import { supabase } from '@/lib/supabase'
 import { getCurrentUser } from '@/lib/auth-client'
 import type { Notification } from '@/lib/types/notification'
@@ -27,13 +28,19 @@ export default function NotificationBell() {
 
   useEffect(() => {
     if (!userId || !userRole) return
+    if (isDemoMode()) return
 
     const fetchUnreadCount = async () => {
-      let query = supabase.from('notifications').select('id', { count: 'exact' }).eq('is_read', false)
-      query = query.or(`user_id.eq.${userId},recipient_role.eq.${userRole}`)
-      const { count, error } = await query
-      if (!error) {
-        setUnreadCount(count ?? 0)
+      try {
+        const response = await fetch('/api/notifications/unread-count')
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success) {
+            setUnreadCount(result.unreadCount ?? 0)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch unread notification count:', err)
       }
     }
 

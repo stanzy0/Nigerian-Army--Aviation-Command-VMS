@@ -44,13 +44,19 @@ export async function transitionVisitStatus(
     throw new Error(error?.message || 'Failed to create lifecycle event')
   }
 
-  const { error: updateError } = await supabaseAdmin
-    .from('visits')
-    .update({ status: toStatus })
-    .eq('id', visitId)
+  // Only update the visits table for statuses that exist in the visit_status enum.
+  // 'overstayed', 'documents_verified', 'badge_issued', 'security_cleared',
+  // 'cancelled' are lifecycle stages tracked in lifecycle_events, not visit enum values.
+  const validVisitStatuses = ['pending', 'approved', 'checked_in', 'checked_out', 'rejected']
+  if (validVisitStatuses.includes(toStatus)) {
+    const { error: updateError } = await supabaseAdmin
+      .from('visits')
+      .update({ status: toStatus })
+      .eq('id', visitId)
 
-  if (updateError) {
-    throw new Error(updateError.message)
+    if (updateError) {
+      throw new Error(updateError.message)
+    }
   }
 
   const auditActions: Record<string, string> = {
@@ -181,6 +187,7 @@ export async function processExpiredVisits(): Promise<ExpiredVisitResult[]> {
     .from('visits')
     .select('id, visitor_id, check_in_time, visitor:visitors(full_name)')
     .eq('status', 'checked_in')
+    .eq('is_overdue', false)
     .lt('check_in_time', new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString())
 
   if (!overstayedVisits || overstayedVisits.length === 0) {
@@ -194,7 +201,9 @@ export async function processExpiredVisits(): Promise<ExpiredVisitResult[]> {
     const checkInTime = visit.check_in_time ? new Date(visit.check_in_time) : new Date()
     const hoursOverdue = (new Date().getTime() - checkInTime.getTime()) / (1000 * 60 * 60)
 
-    await supabaseAdmin.from('visits').update({ status: 'overstayed' }).eq('id', visit.id)
+    // Mark the visit as overdue using the is_overdue boolean column.
+    // 'overstayed' is NOT a valid visit_status enum value, so we do not write it to visits.status.
+    await supabaseAdmin.from('visits').update({ is_overdue: true }).eq('id', visit.id)
 
     await supabaseAdmin.from('security_alerts').insert({
       alert_type: 'Visitor Overstayed',
@@ -314,7 +323,7 @@ export async function getLifecycleStats(range: 'today' | '7days' | '30days' = 't
     supabaseAdmin
       .from('visits')
       .select('check_in_time, created_at')
-      .eq('status', 'overstayed')
+      .eq('is_overdue', true)
       .gte('created_at', startStr)
       .lte('created_at', endStr),
     supabaseAdmin
@@ -349,7 +358,7 @@ export async function getLifecycleStats(range: 'today' | '7days' | '30days' = 't
     if (!visits || visits.length === 0) return 0
     const durations = visits
       .filter((v) => v.check_in_time && v.check_out_time)
-      .map((v) => (new Date(v.check_out_time).getTime() - new Date(v.check_in_time).getTime()) / (1000 * 60))
+      .map((v) => (new Date(v.check_out_time).getTime() - new Date(v.check_in_time).getTime()) / 60000)
     if (durations.length === 0) return 0
     return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
   }
@@ -359,7 +368,7 @@ export async function getLifecycleStats(range: 'today' | '7days' | '30days' = 't
     const now = new Date()
     const durations = visits
       .filter((v) => v.check_in_time)
-      .map((v) => (now.getTime() - new Date(v.check_in_time).getTime()) / (1000 * 60))
+      .map((v) => (now.getTime() - new Date(v.check_in_time).getTime()) / 60000)
     if (durations.length === 0) return 0
     return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
   }

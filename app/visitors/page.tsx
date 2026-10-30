@@ -225,7 +225,7 @@ return (
       <div className="absolute inset-0 z-0">
         <img
           src="/images/afcsc-login.jpg"
-          alt="Armed Forces Command and Staff College background"
+          alt="Nigerian Army Aviation Command background"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F08]/90 via-[#0B0F08]/70 to-[#0B0F08]/40" />
@@ -350,4 +350,5 @@ return (
     </div>
   )
 }
+
 

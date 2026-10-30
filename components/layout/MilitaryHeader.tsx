@@ -40,7 +40,7 @@ export default function MilitaryHeader() {
           primary_color: json.data.primary_color || '#4B5320',
           secondary_color: json.data.secondary_color || '#556B2F',
           accent_color: json.data.accent_color || '#C8A646',
-          college_name: json.data.college_name || 'Department of Land Warfare',
+          college_name: json.data.college_name || 'Nigerian Army Aviation Command',
         })
       })
       .catch(() => {})
@@ -58,7 +58,6 @@ export default function MilitaryHeader() {
   }, [])
 
   const institutionLogo = branding?.logo_url || '/images/afcsc-logo.png'
-  const armyLogo = '/images/army logo.png'
 
   const filteredNavLinks = NAV_LINKS.filter(link => !link.roles || link.roles.includes(userRole as UserRole))
 
@@ -69,22 +68,17 @@ export default function MilitaryHeader() {
           <Link
             href="/"
             className="flex items-center gap-3 sm:gap-4 min-w-0 transition-opacity duration-200 hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-[#C8A646]/60 focus:ring-offset-2 focus:ring-offset-[#10150D] rounded"
-            aria-label="DLW Visitor Management - Go to homepage"
+            aria-label="Nigerian Army Aviation Command Visitor Management - Go to homepage"
             title="Go to homepage"
           >
             <ImageWithFallback
               src={institutionLogo}
-              alt="Armed Forces Command and Staff College Logo"
+              alt="Nigerian Army Aviation Command Logo"
               className="h-8 w-8 sm:h-9 sm:w-9 object-contain flex-shrink-0"
             />
             <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-[#F5F5DC] whitespace-nowrap">
-              DLW Visitor Management
+              Nigerian Army Aviation Command Visitor Management
             </span>
-            <ImageWithFallback
-              src={armyLogo}
-              alt="Department of Land Warfare Logo"
-              className="h-7 w-7 sm:h-8 sm:w-8 object-contain flex-shrink-0"
-            />
           </Link>
 
           <nav className="hidden lg:flex items-center gap-6">
@@ -132,3 +126,4 @@ export default function MilitaryHeader() {
     </header>
   )
 }
+

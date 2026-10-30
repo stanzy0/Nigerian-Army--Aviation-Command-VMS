@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
   const dateQuery = !isAdmin && hostEmployeeId ? baseQuery.eq('employee_id', hostEmployeeId!) : baseQuery
 
   const [{ data: dateData, error: dateError }] = await Promise.all([
-    dateQuery.then(q => q),
+    dateQuery.then((q: unknown) => q),
   ])
 
   if (dateError) {
@@ -112,10 +112,10 @@ export async function GET(request: NextRequest) {
   }
 
   const all = dateData || []
-  const pendingVisits = all.filter((v) => v.status === 'pending')
-  const approvedVisits = all.filter((v) => v.status === 'approved')
-  const checkedInVisits = all.filter((v) => v.status === 'checked_in')
-  const checkedOutVisits = all.filter((v) => v.status === 'checked_out')
+  const pendingVisits = all.filter((v: { status: string }) => v.status === 'pending')
+  const approvedVisits = all.filter((v: { status: string }) => v.status === 'approved')
+  const checkedInVisits = all.filter((v: { status: string }) => v.status === 'checked_in')
+  const checkedOutVisits = all.filter((v: { status: string }) => v.status === 'checked_out')
 
   return NextResponse.json({
     success: true,

@@ -103,15 +103,20 @@ export default function HostVisitorsPage() {
 
   const handleApprove = async (visitId: string) => {
     setActionLoading(visitId)
-    const { error } = await supabase
-      .from('visits')
-      .update({ status: 'approved' })
-      .eq('id', visitId)
-
-    if (error) {
-      alert(error.message)
-    } else {
-      fetchVisitors()
+    try {
+      const res = await fetch('/api/host/visitors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-employee-id': employeeId || 'default' },
+        body: JSON.stringify({ visitId, action: 'approve' }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.success) {
+        alert(json.message || 'Approval failed')
+      } else {
+        fetchVisitors()
+      }
+    } catch {
+      alert('Approval failed')
     }
     setActionLoading(null)
   }
@@ -122,13 +127,17 @@ export default function HostVisitorsPage() {
       return
     }
     setActionLoading(visitId)
-    const { error } = await supabase
-      .from('visits')
-      .update({ status: 'rejected', rejection_reason: rejectReason })
-      .eq('id', visitId)
 
-    if (error) {
-      alert(error.message)
+    // Use the authorized API route instead of a direct client-side DB update.
+    const res = await fetch(`/api/visits/status?id=${encodeURIComponent(visitId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'rejected' }),
+    })
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}))
+      alert(errData.message || 'Rejection failed')
     } else {
       setRejectingId(null)
       setRejectReason('')

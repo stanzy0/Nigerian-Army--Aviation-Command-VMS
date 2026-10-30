@@ -265,9 +265,16 @@ export default function ReceptionPage() {
     if (newStatus === 'checked_in') updates.check_in_time = new Date().toISOString()
     if (newStatus === 'checked_out') updates.check_out_time = new Date().toISOString()
 
-    const { error } = await supabase.from('visits').update(updates).eq('id', visitId)
-    if (error) {
-      showNotification('error', error.message)
+    // Use the authorized API route instead of a direct client-side DB update.
+    const res = await fetch(`/api/visits/status?id=${encodeURIComponent(visitId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    })
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}))
+      showNotification('error', errData.message || 'Status change failed')
     } else {
       showNotification('success', `Visit ${newStatus.replace('_', ' ')} successfully`)
       fetchAllData()

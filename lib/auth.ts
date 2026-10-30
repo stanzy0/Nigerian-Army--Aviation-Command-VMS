@@ -1,10 +1,24 @@
 import { createClient } from './supabase/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { UserRole, UserWithRole, PERMISSIONS } from './auth-types'
 
 export { PERMISSIONS }
 export type { UserRole, UserWithRole }
 
+import { isDemoMode } from '@/lib/demo'
+
 export async function getCurrentUser(): Promise<UserWithRole | null> {
+  if (isDemoMode()) {
+    return {
+      id: 'demo-admin',
+      email: 'demo.admin@local',
+      full_name: 'Demo Admin (Sample)',
+      role: 'Admin' as UserRole,
+      created_at: new Date().toISOString(),
+      must_change_password: false,
+    }
+  }
+
   const supabase = await createClient()
 
   const {
@@ -13,20 +27,20 @@ export async function getCurrentUser(): Promise<UserWithRole | null> {
 
   if (!user) return null
 
-  const { data: userRole, error } = await supabase
+  if (!supabaseAdmin) {
+    console.error('[getCurrentUser] Service role not configured')
+    return null
+  }
+
+  const { data: userRole, error } = await supabaseAdmin
     .from('user_roles')
     .select('*')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
   if (error || !userRole) {
-    return {
-      id: user.id,
-      email: user.email || '',
-      full_name: null,
-      role: 'Receptionist' as UserRole,
-      created_at: null,
-    }
+    console.error('[getCurrentUser] user_roles query failed:', { error, userId: user.id })
+    return null
   }
 
   return {

@@ -1,6 +1,11 @@
 import { createBrowserClient } from '@supabase/ssr'
 
+import { isDemoMode } from '@/lib/demo'
+
 export const createClient = () => {
+  if (isDemoMode()) {
+    throw new Error('Supabase client is disabled in demo mode.')
+  }
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 

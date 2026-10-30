@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { isDemoMode } from '@/lib/demo'
+import { getDashboardStats, getEmployees, getVisits } from '@/lib/demo/mockData'
 
 export type DateRange = 'today' | 'yesterday' | '7days' | '30days' | 'thisMonth' | 'custom'
 
@@ -135,234 +137,86 @@ export function useDashboardData(filters: DashboardFilters, enabled = true) {
   const [error, setError] = useState<string | null>(null)
 
   const fetchAll = useCallback(async (silent = false) => {
+    if (isDemoMode()) {
+      if (!silent) setLoading(true)
+      setError(null)
+      try {
+        const d = getDashboardStats()
+        setStats(prev => ({
+          ...prev,
+          visitorsToday: d.totalVisitors,
+          visitorsThisWeek: d.totalVisitors,
+          visitorsThisMonth: d.totalVisitors,
+          visitorsCurrentlyInside: d.checkedIn,
+          pendingApprovals: d.pending,
+          checkedIn: d.checkedIn,
+          checkedOut: d.checkedOut,
+          registeredEmployees: getEmployees().length,
+        }))
+      } catch {
+        setError('Demo data unavailable')
+      } finally {
+        if (!silent) setLoading(false)
+      }
+      return
+    }
     if (!silent) {
       setLoading(true)
     }
     setError(null)
     try {
-      getStartEnd(filters.range, filters.customFrom, filters.customTo)
-      const todayStr = new Date().toISOString().split('T')[0]
-      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-
-      const [
-        todayVisitorsRes,
-        weekVisitorsRes,
-        monthVisitorsRes,
-        onSiteRes,
-        pendingRes,
-        checkedInRes,
-        checkedOutRes,
-        activeBadgesRes,
-        cancelledBadgesRes,
-        expiredBadgesRes,
-        employeesRes,
-        officesRes,
-        auditTodayRes,
-        yesterdayVisitorsRes,
-        badgesGeneratedRes,
-        badgesPrintedRes,
-        badgesReprintedRes,
-        byDayRes,
-        byMonthRes,
-        byDeptRes,
-        byHostRes,
-        byOrgRes,
-        byPurposeRes,
-        badgeStatusRes,
-        empByDeptRes,
-        overstayedRes,
-        expiredVisitsRes,
-        missingCheckoutRes,
-        cancelledBadgeActiveRes,
-        activityRes,
-        docsTodayRes,
-        pendingVerificationRes,
-        verifiedDocumentsRes,
-        rejectedDocumentsRes,
-        visitorsWaitingVerificationRes,
-        visitorsWaitingBadgeRes,
-        visitorsWaitingSecurityRes,
-        visitorsOverstayedRes,
-      ] = await Promise.all([
-        supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', todayStr),
-        supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', weekAgo),
-        supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', monthAgo),
-        supabase.from('visits').select('id', { count: 'exact', head: true }).eq('status', 'checked_in'),
-        supabase.from('visits').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('visits').select('id', { count: 'exact', head: true }).eq('status', 'checked_in'),
-        supabase.from('visits').select('id', { count: 'exact', head: true }).eq('status', 'checked_out'),
-        supabase.from('visitor_badges').select('id', { count: 'exact', head: true }).eq('badge_status', 'Active'),
-        supabase.from('visitor_badges').select('id', { count: 'exact', head: true }).eq('badge_status', 'Cancelled'),
-        supabase.from('visitor_badges').select('id', { count: 'exact', head: true }).eq('badge_status', 'Expired'),
-        supabase.from('employees').select('id', { count: 'exact', head: true }),
-        supabase.from('office_locations').select('id', { count: 'exact', head: true }),
-        supabase.from('audit_logs').select('id', { count: 'exact', head: true }).gte('created_at', todayStr),
-        supabase.from('visits').select('id', { count: 'exact', head: true }).gte('created_at', yesterday).lt('created_at', todayStr),
-        supabase.from('visitor_badges').select('id', { count: 'exact', head: true }).gte('created_at', todayStr),
-        supabase.from('visitor_badges').select('id', { count: 'exact', head: true }).not('printed_at', 'is', null).gte('printed_at', todayStr),
-        supabase.from('visitor_badges').select('id', { count: 'exact', head: true }).gte('reprint_count', 1).gte('updated_at', todayStr),
-        supabase.from('visits').select('created_at').gte('created_at', monthAgo).order('created_at', { ascending: true }),
-        supabase.from('visits').select('created_at').gte('created_at', new Date(new Date().getFullYear(), 0, 1).toISOString()),
-        supabase.from('visits').select('employee:employees(department)').gte('created_at', monthAgo).neq('status', 'rejected'),
-        supabase.from('visits').select('employee:employees(full_name)').gte('created_at', monthAgo).neq('status', 'rejected'),
-        supabase.from('visits').select('visitor:visitors(visitor_organization)').gte('created_at', monthAgo).neq('status', 'rejected'),
-        supabase.from('visits').select('purpose').gte('created_at', monthAgo).neq('status', 'rejected'),
-        supabase.from('visitor_badges').select('badge_status').gte('created_at', monthAgo),
-        supabase.from('employees').select('department').eq('status', 'active'),
-        supabase.from('visits').select('id, check_in_time').eq('status', 'checked_in').lt('check_in_time', new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString()),
-        supabase.from('visits').select('id, check_in_time').eq('status', 'checked_in').lt('expires_at', new Date().toISOString()),
-        supabase.from('visits').select('id').eq('status', 'checked_out').is('check_out_time', null),
-        supabase.from('visitor_badges').select('id, badge_status').eq('badge_status', 'Cancelled'),
-        supabase.from('audit_logs').select('action, details, created_at, entity_type').order('created_at', { ascending: false }).limit(20),
-        supabase.from('visitor_documents').select('id', { count: 'exact', head: true }).gte('created_at', todayStr),
-        supabase.from('visitor_documents').select('id', { count: 'exact', head: true }).eq('verification_status', 'Pending'),
-        supabase.from('visitor_documents').select('id', { count: 'exact', head: true }).eq('verification_status', 'Verified'),
-        supabase.from('visitor_documents').select('id', { count: 'exact', head: true }).eq('verification_status', 'Rejected'),
-        supabase.from('visits').select('id', { count: 'exact', head: true }).eq('status', 'approved').gte('created_at', todayStr),
-        (async () => {
-          const { data: visits } = await supabase.from('visits').select('id').in('status', ['approved', 'documents_verified'])
-          const visitIds = (visits || []).map((v: { id: string }) => v.id)
-          const { count } = await supabase.from('visitor_badges').select('id', { count: 'exact', head: true }).in('visit_id', visitIds)
-          return { count: ((visits || []).length) - (count || 0) }
-        })(),
-        supabase.from('visits').select('id', { count: 'exact', head: true }).eq('status', 'badge_issued'),
-        supabase.from('visits').select('id', { count: 'exact', head: true }).eq('status', 'overstayed'),
-      ])
-
-      const missingDocsRes = await (async () => {
-        const { data: docVisitorIds } = await supabase
-          .from('visitor_documents')
-          .select('visitor_id')
-          .not('visitor_id', 'is', null)
-
-         const uniqueVisitorIds = [...new Set((docVisitorIds || []).map((d: { visitor_id: string }) => d.visitor_id).filter(Boolean))]
-
-         if (uniqueVisitorIds.length === 0) {
-          const { count } = await supabase
-            .from('visitors')
-            .select('id', { count: 'exact', head: true })
-          return { count }
-        }
-
-         const postgrestFilter = `(${uniqueVisitorIds.join(',')})`
-
-         const { count } = await supabase
-          .from('visitors')
-          .select('id', { count: 'exact', head: true })
-          .not('id', 'in', postgrestFilter)
-
-        return { count }
-      })()
-
-      const yesterdayTotal = yesterdayVisitorsRes.count ?? 0
-      const visitorsTrend = yesterdayTotal > 0 ? ((todayVisitorsRes.count ?? 0) - yesterdayTotal) / yesterdayTotal : 0
+      const response = await fetch('/api/dashboard/stats')
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data')
+      }
+      const result = await response.json()
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch dashboard data')
+      }
+      const d = result.data
 
       setStats({
-        visitorsToday: todayVisitorsRes.count ?? 0,
-        visitorsThisWeek: weekVisitorsRes.count ?? 0,
-        visitorsThisMonth: monthVisitorsRes.count ?? 0,
-        visitorsCurrentlyInside: onSiteRes.count ?? 0,
-        pendingApprovals: pendingRes.count ?? 0,
-        checkedIn: checkedInRes.count ?? 0,
-        checkedOut: checkedOutRes.count ?? 0,
-        activeBadges: activeBadgesRes.count ?? 0,
-        cancelledBadges: cancelledBadgesRes.count ?? 0,
-        expiredBadges: expiredBadgesRes.count ?? 0,
-        registeredEmployees: employeesRes.count ?? 0,
-        officeLocations: officesRes.count ?? 0,
-        auditEventsToday: auditTodayRes.count ?? 0,
-        yesterdayTotal,
-        visitorsTrend,
-        badgesGenerated: badgesGeneratedRes.count ?? 0,
-        badgesPrinted: badgesPrintedRes.count ?? 0,
-        badgesReprinted: badgesReprintedRes.count ?? 0,
-        documentsUploadedToday: docsTodayRes.count ?? 0,
-        pendingVerification: pendingVerificationRes.count ?? 0,
-        verifiedDocuments: verifiedDocumentsRes.count ?? 0,
-        rejectedDocuments: rejectedDocumentsRes.count ?? 0,
-        missingDocuments: missingDocsRes.count ?? 0,
-        visitorsWaitingVerification: visitorsWaitingVerificationRes.count ?? 0,
-        visitorsWaitingBadge: visitorsWaitingBadgeRes.count ?? 0,
-        visitorsWaitingSecurity: visitorsWaitingSecurityRes.count ?? 0,
-        visitorsOverstayed: visitorsOverstayedRes.count ?? 0,
+        visitorsToday: d.visitorsToday,
+        visitorsThisWeek: d.visitorsThisWeek,
+        visitorsThisMonth: d.visitorsThisMonth,
+        visitorsCurrentlyInside: d.visitorsCurrentlyInside,
+        pendingApprovals: d.pendingApprovals,
+        checkedIn: d.checkedIn,
+        checkedOut: d.checkedOut,
+        activeBadges: d.activeBadges,
+        cancelledBadges: d.cancelledBadges,
+        expiredBadges: d.expiredBadges,
+        registeredEmployees: d.registeredEmployees,
+        officeLocations: d.officeLocations,
+        auditEventsToday: d.auditEventsToday,
+        yesterdayTotal: d.yesterdayTotal,
+        visitorsTrend: d.visitorsTrend,
+        badgesGenerated: d.badgesGenerated,
+        badgesPrinted: d.badgesPrinted,
+        badgesReprinted: d.badgesReprinted,
+        documentsUploadedToday: d.documentsUploadedToday,
+        pendingVerification: d.pendingVerification,
+        verifiedDocuments: d.verifiedDocuments,
+        rejectedDocuments: d.rejectedDocuments,
+        missingDocuments: d.missingDocuments,
+        visitorsWaitingVerification: d.visitorsWaitingVerification,
+        visitorsWaitingBadge: d.visitorsWaitingBadge,
+        visitorsWaitingSecurity: d.visitorsWaitingSecurity,
+        visitorsOverstayed: d.visitorsOverstayed,
       })
 
-        const processByDay = (data: { created_at: string | null | undefined }[] | undefined) => {
-          const map = new Map<string, number>()
-          data?.forEach((r) => {
-            if (!r.created_at) return
-            const d = new Date(r.created_at).toISOString().split('T')[0]
-            map.set(d, (map.get(d) || 0) + 1)
-          })
-          return Array.from(map.entries())
-            .map(([date, count]) => ({ name: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), count }))
-            .sort((a, b) => a.name.localeCompare(b.name))
-        }
+      const cd = d.chartData
+      setVisitorsByDay(cd.visitorsByDay || [])
+      setVisitorsByMonth(cd.visitorsByMonth || [])
+      setVisitorsByDepartment(cd.visitorsByDepartment || [])
+      setVisitorsByHost(cd.visitorsByHost || [])
+      setVisitorsByCompany(cd.visitorsByCompany || [])
+      setVisitorsByPurpose(cd.visitorsByPurpose || [])
+      setBadgeStatusDistribution(cd.badgeStatusDistribution || [])
+      setEmployeesByDepartment(cd.employeesByDepartment || [])
 
-        const processByMonth = (data: { created_at: string | null | undefined }[] | undefined) => {
-          const map = new Map<string, number>()
-          data?.forEach((r) => {
-            if (!r.created_at) return
-            const d = new Date(r.created_at)
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-            map.set(key, (map.get(key) || 0) + 1)
-          })
-          return Array.from(map.entries())
-            .map(([month, count]) => ({ name: month, count }))
-        }
-
-      const processField = (data: Record<string, unknown>[] | undefined, field: string) => {
-        const map = new Map<string, number>()
-        data?.forEach((r) => {
-          const val = typeof r[field] === 'object' && r[field] !== null ? Object.values(r[field])[0] : r[field]
-          const key = val || 'Unknown'
-          map.set(key as string, (map.get(key as string) || 0) + 1)
-        })
-        return Array.from(map.entries())
-          .map(([name, count]) => ({ name, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 10)
-      }
-
-      setVisitorsByDay(processByDay(byDayRes.data || []))
-      setVisitorsByMonth(processByMonth(byMonthRes.data || []))
-      setVisitorsByDepartment(processField(byDeptRes.data || [], 'department'))
-      setVisitorsByHost(processField(byHostRes.data || [], 'full_name'))
-      setVisitorsByCompany(processField(byOrgRes.data || [], 'visitor_organization'))
-      setVisitorsByPurpose(processField(byPurposeRes.data || [], 'purpose'))
-
-      const badgeStatusMap = new Map<string, number>()
-      badgeStatusRes.data?.forEach((r) => {
-        const status = r.badge_status || 'Unknown'
-        badgeStatusMap.set(status, (badgeStatusMap.get(status) || 0) + 1)
-      })
-      setBadgeStatusDistribution(Array.from(badgeStatusMap.entries()).map(([name, count]) => ({ name, count })))
-
-      const empDeptMap = new Map<string, number>()
-      empByDeptRes.data?.forEach((r) => {
-        const dept = r.department || 'Unknown'
-        empDeptMap.set(dept, (empDeptMap.get(dept) || 0) + 1)
-      })
-      setEmployeesByDepartment(Array.from(empDeptMap.entries()).map(([name, count]) => ({ name, count })))
-
-      const alerts: SecurityAlert[] = []
-      if ((overstayedRes.count ?? 0) > 0) alerts.push({ type: 'overstayed', label: 'Overstayed Visitors', count: overstayedRes.count ?? 0, severity: 'critical' })
-      if ((expiredVisitsRes.count ?? 0) > 0) alerts.push({ type: 'expired_visit', label: 'Expired Visits', count: expiredVisitsRes.count ?? 0, severity: 'warning' })
-      if ((missingCheckoutRes.count ?? 0) > 0) alerts.push({ type: 'missing_checkout', label: 'Missing Check-Out', count: missingCheckoutRes.count ?? 0, severity: 'critical' })
-      if ((cancelledBadgeActiveRes.count ?? 0) > 0) alerts.push({ type: 'cancelled_badge_active', label: 'Cancelled Badges Still Active', count: cancelledBadgeActiveRes.count ?? 0, severity: 'warning' })
-      setSecurityAlerts(alerts)
-
-      setActivity(
-        (activityRes.data || []).map((r) => ({
-          id: `${r.created_at}-${r.action}`,
-          action: r.action,
-          details: r.details,
-          created_at: r.created_at,
-          entity_type: r.entity_type,
-        }))
-      )
+      setSecurityAlerts(d.securityAlerts || [])
+      setActivity(d.activity || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
     } finally {
@@ -390,11 +244,13 @@ export function useDashboardData(filters: DashboardFilters, enabled = true) {
 
   useEffect(() => {
     if (!enabled) return
+    if (isDemoMode()) return
     fetchAllRef.current()
   }, [filters, enabled])
 
   useEffect(() => {
     if (!enabled) return
+    if (isDemoMode()) return
 
     const debouncedRefresh = () => {
       if (debounceRef.current) {

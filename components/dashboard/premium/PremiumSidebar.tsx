@@ -165,7 +165,7 @@ export default function PremiumSidebar({
           <Link
             href="/"
             className="flex items-center justify-center w-full transition-opacity duration-200 hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-white/40 focus:ring-offset-2 focus:ring-offset-slate-900 rounded"
-             aria-label="DLW Visitor Management - Go to homepage"
+             aria-label="Nigerian Army Aviation Command Visitor Management - Go to homepage"
              title="Go to homepage"
           >
             <motion.div
@@ -174,21 +174,13 @@ export default function PremiumSidebar({
             >
               <ImageWithFallback
                 src={institutionLogo}
-                alt="Armed Forces Command and Staff College Logo"
+                alt="Nigerian Army Aviation Command Logo"
                 className="h-8 w-8 object-contain flex-shrink-0"
               />
               {!isCollapsed && (
                 <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="flex-1 text-center">
-                  <span className="text-sm font-bold text-white tracking-tight leading-tight">DLW Visitor Management</span>
-                  <span className="text-[10px] text-[#9A9F87] block leading-tight">Department of Land Warfare</span>
+                  <span className="text-xs font-bold text-[#9A9F87] block leading-tight">Nigerian Army Aviation Command</span>
                 </motion.div>
-              )}
-              {!isCollapsed && (
-                <ImageWithFallback
-                  src="/images/army logo.png"
-                  alt="Department of Land Warfare Logo"
-                  className="h-7 w-7 object-contain flex-shrink-0"
-                />
               )}
             </motion.div>
           </Link>
@@ -312,3 +304,4 @@ export default function PremiumSidebar({
     </>
   )
 }
+

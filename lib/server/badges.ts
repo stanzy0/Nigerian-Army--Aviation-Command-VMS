@@ -361,7 +361,7 @@ export async function getBadgeStatistics(): Promise<{ totalIssued: number; total
     supabaseAdmin.from('visitor_badges').select('reprint_count').neq('reprint_count', 0),
   ])
 
-  const totalReprints = reprints.data?.reduce((sum, b: Record<string, unknown>) => sum + ((b.reprint_count as number) || 0), 0) || 0
+  const totalReprints = reprints.data?.reduce((sum: number, b: Record<string, unknown>) => sum + ((b.reprint_count as number) || 0), 0) || 0
 
   return {
     totalIssued: totalIssued.count || 0,

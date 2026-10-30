@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: 'Internal server error' }, { status: 500 })
     }
 
-    const user = users.users.find(u => u.email === email)
+    const user = users.users.find((u: { email?: string }) => u.email === email)
 
     if (!user) {
       return NextResponse.json({ locked: false, remainingAttempts: MAX_FAILED_ATTEMPTS })

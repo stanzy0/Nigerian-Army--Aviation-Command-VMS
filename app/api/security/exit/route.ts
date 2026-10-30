@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isDemoMode } from '@/lib/demo'
 import { createGateActivity, createSecurityDecision } from '@/lib/server/security'
 import { logAuditAction } from '@/lib/server/audit'
 import { getCurrentUser } from '@/lib/auth'
 import { sendEmail } from '@/lib/server/email'
+import { applyVisitStatusChange, type VisitStatus } from '@/lib/server/visit-status'
 
 function calculateDuration(checkInTime: string): string {
   const checkIn = new Date(checkInTime)
@@ -84,6 +86,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    if (isDemoMode()) {
+      return NextResponse.json({ success: true, data: { id: 'demo-activity', message: 'Demo mode: exit simulated' } }, { status: 201 })
+    }
+
     if (!supabaseAdmin) {
       return NextResponse.json({ success: false, message: 'Server configuration error', error: 'Service role key not configured' }, { status: 500 })
     }
@@ -179,29 +185,31 @@ export async function POST(request: NextRequest) {
           const currentVisit = Array.isArray(visit.visitor) ? visit.visitor[0] : visit.visitor
           const employee = Array.isArray(visit.employee) ? visit.employee[0] : visit.employee
 
-          await supabaseAdmin
-            .from('visits')
-            .update({ status: 'checked_out', check_out_time: new Date().toISOString() })
-            .eq('id', visit_id)
+          // Use the atomic status-change function for checked_out transition.
+          const result = await applyVisitStatusChange(visit_id, 'checked_out', {
+            approvedBy: user?.id ?? null,
+          })
 
-          if (employee?.email) {
-            await sendEmail({
-              to: employee.email,
-              recipientName: employee.full_name || 'Host',
-              subject: `Visitor Has Left - ${currentVisit?.registration_number || visit_id}`,
-              template: 'visitor_checked_out',
-              data: {
-                visitorName: currentVisit?.full_name || 'Visitor',
-                checkInTime: visit.check_in_time ? new Date(visit.check_in_time).toLocaleString() : 'N/A',
-                checkOutTime: new Date().toLocaleString(),
-                duration: visit.check_in_time ? calculateDuration(visit.check_in_time) : 'N/A',
-                purpose: visit.purpose || 'Visit',
-                hostName: employee.full_name || 'Host',
-                orgName: 'Department of Land Warfare',
-              },
-              relatedType: 'visit',
-              relatedId: visit_id,
-            })
+          if (result.outcome === 'success') {
+            if (employee?.email) {
+              await sendEmail({
+                to: employee.email,
+                recipientName: employee.full_name || 'Host',
+                subject: `Visitor Has Left - ${currentVisit?.registration_number || visit_id}`,
+                template: 'visitor_checked_out',
+                data: {
+                  visitorName: currentVisit?.full_name || 'Visitor',
+                  checkInTime: visit.check_in_time ? new Date(visit.check_in_time).toLocaleString() : 'N/A',
+                  checkOutTime: new Date().toLocaleString(),
+                  duration: visit.check_in_time ? calculateDuration(visit.check_in_time) : 'N/A',
+                  purpose: visit.purpose || 'Visit',
+                  hostName: employee.full_name || 'Host',
+                  orgName: 'Department of Land Warfare',
+                },
+                relatedType: 'visit',
+                relatedId: visit_id,
+              })
+            }
           }
         }
       }

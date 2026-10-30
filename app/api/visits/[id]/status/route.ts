@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getCurrentUser } from '@/lib/auth'
+import { isDemoMode } from '@/lib/demo'
 import { applyVisitStatusChange, InvalidTransitionError, type VisitStatus } from '@/lib/server/visit-status'
 import { getHostEmployeeIdForPA } from '@/lib/server/pa-helpers'
 
@@ -11,6 +12,14 @@ export async function POST(request: NextRequest) {
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ success: false, message: 'Unauthorized', error: '' }, { status: 401 })
+  }
+
+  if (isDemoMode()) {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id') || ''
+    const body = await request.json().catch(() => ({}))
+    const newStatus = (body?.status || 'approved') as VisitStatus
+    return NextResponse.json({ success: true, data: { visit_id: id, status: newStatus, message: 'Demo mode: status change simulated' } })
   }
 
   if (!supabaseAdmin) {
@@ -62,15 +71,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const updatedVisit = await applyVisitStatusChange(id, newStatus, {
+    const result = await applyVisitStatusChange(id, newStatus, {
       auditAction: 'Visit Status Changed',
       auditDetails: `Visit ${newStatus}`,
+      approvedBy: user.id,
     })
 
-    return NextResponse.json({ success: true, data: updatedVisit })
+    switch (result.outcome) {
+      case 'not_found':
+        return NextResponse.json({ success: false, message: 'Visit not found', error: 'not_found' }, { status: 404 })
+      case 'authorization':
+        return NextResponse.json({ success: false, message: result.message, error: 'forbidden' }, { status: 403 })
+      case 'invalid_transition':
+        return NextResponse.json({ success: false, message: result.message, error: 'invalid_transition' }, { status: 409 })
+      case 'success':
+        // Outbox events are now enqueued transactionally by the atomic DB function.
+        // No separate enqueue needed here.
+        return NextResponse.json({ success: true, data: result })
+      default:
+        return NextResponse.json({ success: false, message: 'Unexpected outcome', error: 'internal' }, { status: 500 })
+    }
   } catch (err) {
     if (err instanceof InvalidTransitionError) {
-      return NextResponse.json({ success: false, message: err.message, error: 'invalid_transition' }, { status: 422 })
+      return NextResponse.json({ success: false, message: err.message, error: 'invalid_transition' }, { status: 409 })
     }
     console.error('Visit status update error:', err)
     return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: 'Internal server error' }, { status: 500 })

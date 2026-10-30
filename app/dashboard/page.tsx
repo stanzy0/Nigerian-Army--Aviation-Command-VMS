@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { isDemoMode } from '@/lib/demo'
+import { getVisits } from '@/lib/demo/mockData'
 import { supabase } from '@/lib/supabase'
 import { getCurrentUser, UserRole } from '@/lib/auth-client'
 import { getAuthHeaders } from '@/lib/client/api'
@@ -118,6 +120,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchSecurityStats = async () => {
       if (!authReady) return
+      if (isDemoMode()) return
       if (!['Admin', 'Commandant', 'Director', 'Security', 'Operations', 'Host Employee'].includes(userRole)) return
 
       try {
@@ -149,6 +152,10 @@ export default function DashboardPage() {
 
   const fetchPendingOnlineRegistrations = useCallback(async () => {
     if (!authReady) return
+    if (isDemoMode()) {
+      setPendingOnlineRegistrations([])
+      return
+    }
     if (!['Admin', 'Receptionist'].includes(userRole)) {
       setPendingOnlineRegistrations([])
       return
@@ -185,6 +192,10 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchPendingDocuments = async () => {
       if (!authReady) return
+      if (isDemoMode()) {
+        setPendingDocuments([])
+        return
+      }
       if (userRole === 'Receptionist') return
 
       try {
@@ -233,15 +244,29 @@ export default function DashboardPage() {
 
   const fetchRecentVisitors = useCallback(async () => {
     if (!authReady) return
+    if (isDemoMode()) {
+      const data = getVisits().slice(0, 8)
+      const mapped = data.map((visit: any) => ({
+        id: visit.id,
+        full_name: visit.visitor?.full_name || 'Demo Visitor',
+        photo_url: visit.visitor?.photo_url || null,
+        purpose: visit.purpose || 'Demo visit',
+        host_name: visit.employee?.full_name || 'Demo Host',
+        host_department: visit.employee?.department || '—',
+        status: visit.status,
+        created_at: visit.created_at,
+      }))
+      setRecentVisitors(mapped)
+      return
+    }
     try {
-      const { data } = await supabase
-        .from('visits')
-        .select('id, status, created_at, purpose, visitor:visitors(full_name, photo_url), employee:employees(full_name, department)')
-        .order('created_at', { ascending: false })
-        .limit(8)
-
-      if (data) {
-        const mapped = (data as Array<{
+      const response = await fetch('/api/dashboard/stats')
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data')
+      }
+      const result = await response.json()
+      if (result.success && result.data.recentVisitors) {
+        const mapped = (result.data.recentVisitors as Array<{
           id: string
           status: string
           created_at: string
@@ -273,6 +298,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!authReady) return
+    if (isDemoMode()) return
     const channel = supabase
       .channel('dashboard-pending-registrations')
       .on(
@@ -291,6 +317,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!authReady) return
+    if (isDemoMode()) return
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         refetch()
@@ -313,7 +340,9 @@ export default function DashboardPage() {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut()
+      if (!isDemoMode()) {
+        await supabase.auth.signOut()
+      }
     } catch {
       // ignore logout errors
     }

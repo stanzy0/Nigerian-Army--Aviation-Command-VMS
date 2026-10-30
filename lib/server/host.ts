@@ -1,7 +1,8 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { logAuditAction } from '@/lib/server/audit'
-import { createHostNotification, createSystemNotification } from '@/lib/server/notification-service'
+import { createHostNotification } from '@/lib/server/notification-service'
 import { sendEmail } from '@/lib/server/email'
+import { applyVisitStatusChange } from '@/lib/server/visit-status'
 import type { HostDashboardStats, HostReport, EmployeeProfile } from '@/lib/types/host'
 
 export async function getHostDashboardStats(employeeId: string): Promise<HostDashboardStats> {
@@ -70,16 +71,27 @@ export async function approveVisitor(visitId: string, employeeId: string): Promi
   const visitor = Array.isArray(visit.visitor) ? visit.visitor[0] : visit.visitor
   const employee = Array.isArray(visit.employee) ? visit.employee[0] : visit.employee
 
-  const { data: updated, error: updateError } = await supabaseAdmin
-    .from('visits')
-    .update({ status: 'approved' })
-    .eq('id', visitId)
-    .select()
-    .single()
+  const visitDate = visit.scheduled_date ? new Date(visit.scheduled_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
 
-  if (updateError || !updated) {
-    throw new Error(updateError?.message || 'Failed to approve visitor')
+  const actorUserId = employee?.user_id ?? null
+
+  // Use the atomic status-change function for pending -> approved transition.
+  const result = await applyVisitStatusChange(visitId, 'approved', {
+    auditAction: 'Visitor Approved by Host',
+    auditDetails: `Host approved visit ${visitId}`,
+    approvedBy: actorUserId,
+  })
+
+  if (result.outcome !== 'success') {
+    throw new Error(result.message || 'Failed to approve visitor')
   }
+
+  // Fetch the updated visit record for backward-compatible response shape.
+  const { data: updatedVisit } = await supabaseAdmin
+    .from('visits')
+    .select('*, visitor:visitors(*), employee:employees(*)')
+    .eq('id', visitId)
+    .single()
 
   await sendEmail({
     to: visitor?.email || '',
@@ -89,8 +101,8 @@ export async function approveVisitor(visitId: string, employeeId: string): Promi
     data: {
       visitorName: visitor?.full_name || 'Visitor',
       registrationNumber: visit.registration_number || visitId,
-      date: visit.visit_date || new Date().toISOString().split('T')[0],
-      time: visit.arrival_time || 'TBD',
+      date: visitDate,
+      time: 'TBD',
       purpose: visit.purpose || 'Business',
       hostName: employee?.full_name || 'Host',
       badgeNumber: 'Print badge upon arrival',
@@ -103,7 +115,7 @@ export async function approveVisitor(visitId: string, employeeId: string): Promi
     await createHostNotification(
       employeeId,
       'Visitor Approved',
-      `${visitor?.full_name || 'A visitor'}'s registration has been approved for ${visit.visit_date || 'today'}.`,
+      `${visitor?.full_name || 'A visitor'}'s registration has been approved for ${visitDate}.`,
       'success',
       'visit',
       visitId
@@ -112,7 +124,7 @@ export async function approveVisitor(visitId: string, employeeId: string): Promi
 
   await logAuditAction('Visitor Approved by Host', 'visit', visitId, `Host approved visit ${visitId}`)
 
-  return updated
+  return (updatedVisit || result) as Record<string, unknown>
 }
 
 export async function rejectVisitor(visitId: string, employeeId: string, reason: string): Promise<Record<string, unknown>> {
@@ -132,15 +144,20 @@ export async function rejectVisitor(visitId: string, employeeId: string, reason:
   const visitor = Array.isArray(visit.visitor) ? visit.visitor[0] : visit.visitor
   const employee = Array.isArray(visit.employee) ? visit.employee[0] : visit.employee
 
-  const { data: updated, error: updateError } = await supabaseAdmin
-    .from('visits')
-    .update({ status: 'rejected', rejection_reason: reason })
-    .eq('id', visitId)
-    .select()
-    .single()
+  const visitDate = visit.scheduled_date ? new Date(visit.scheduled_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
 
-  if (updateError || !updated) {
-    throw new Error(updateError?.message || 'Failed to reject visitor')
+  const actorUserId = employee?.user_id ?? null
+
+  // Use the atomic status-change function for pending -> rejected transition.
+  const result = await applyVisitStatusChange(visitId, 'rejected', {
+    rejectionReason: reason,
+    auditAction: 'Visitor Rejected by Host',
+    auditDetails: `Host rejected visit ${visitId}. Reason: ${reason}`,
+    approvedBy: actorUserId,
+  })
+
+  if (result.outcome !== 'success') {
+    throw new Error(result.message || 'Failed to reject visitor')
   }
 
   await sendEmail({
@@ -151,7 +168,7 @@ export async function rejectVisitor(visitId: string, employeeId: string, reason:
     data: {
       visitorName: visitor?.full_name || 'Visitor',
       registrationNumber: visit.registration_number || visitId,
-      date: visit.visit_date || new Date().toISOString().split('T')[0],
+      date: visitDate,
       hostName: employee?.full_name || 'Host',
       reason: reason || 'No reason provided',
     },
@@ -163,7 +180,7 @@ export async function rejectVisitor(visitId: string, employeeId: string, reason:
     await createHostNotification(
       employeeId,
       'Visitor Rejected',
-      `${visitor?.full_name || 'A visitor'}'s invitation was rejected for ${visit.visit_date || 'today'}. Reason: ${reason}.`,
+      `${visitor?.full_name || 'A visitor'}'s invitation was rejected for ${visitDate}. Reason: ${reason}.`,
       'error',
       'visit',
       visitId
@@ -172,7 +189,13 @@ export async function rejectVisitor(visitId: string, employeeId: string, reason:
 
   await logAuditAction('Visitor Rejected by Host', 'visit', visitId, `Host rejected visit ${visitId}. Reason: ${reason}`)
 
-  return updated
+  const { data: updatedVisit } = await supabaseAdmin
+    .from('visits')
+    .select('*, visitor:visitors(*), employee:employees(*)')
+    .eq('id', visitId)
+    .single()
+
+  return (updatedVisit || result) as Record<string, unknown>
 }
 
 export async function getHostInvitations(employeeId: string): Promise<Record<string, unknown>[]> {
@@ -292,7 +315,7 @@ export async function getHostReport(employeeId: string, range: 'today' | '7days'
     monthlyVisitors: monthlyVisitorsRes.count ?? 0,
     frequentVisitors,
     pendingVisitors: pendingVisitorsRes.count ?? 0,
-    visitorHistory: (visitorHistoryRes.data || []).map((v) => {
+    visitorHistory: (visitorHistoryRes.data || []).map((v: Record<string, unknown>) => {
       const visitor = Array.isArray(v.visitor) ? v.visitor[0] : v.visitor
       return {
         id: v.id,

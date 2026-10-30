@@ -2,7 +2,10 @@
 
   import { useState, useEffect, useRef } from 'react'
   import { supabase } from '@/lib/supabase'
-  import { getCurrentUser, UserWithRole, UserRole } from '@/lib/auth-client'
+  import { getCurrentUser } from '@/lib/auth-client'
+import type { UserWithRole, UserRole } from '@/lib/auth-client'
+
+type UserWithHostAssignment = UserWithRole & { user_id: string; host_assignment?: { employee_id: string; full_name: string | null; position: string | null; department: string | null } | null }
   import { logAuditAction } from '@/lib/client/audit'
   import { getAuthHeaders } from '@/lib/client/api'
   import { getCiEmployees, getDirectors } from '@/lib/client/employees'
@@ -15,14 +18,14 @@ const searchInputClasses = "pl-9 pr-4 py-2 border border-gray-300 rounded-lg bg-
 const selectClasses = "rounded-lg border border-gray-300 bg-[#10150D] px-3 py-2 text-black focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<Array<UserWithRole & { user_id: string }>>([])
+  const [users, setUsers] = useState<UserWithHostAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [authChecking, setAuthChecking] = useState(true)
   const [userRole, setUserRole] = useState<UserRole>('Receptionist')
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
-  const [editingUser, setEditingUser] = useState<(UserWithRole & { user_id: string }) | null>(null)
+  const [editingUser, setEditingUser] = useState<UserWithHostAssignment | null>(null)
   const [formData, setFormData] = useState({ email: '', full_name: '', role: 'Receptionist' as UserRole, assigned_host_id: '' as string, assigned_director_id: '' as string })
   const [mustChangePassword, setMustChangePassword] = useState(true)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
@@ -65,11 +68,11 @@ export default function UsersPage() {
         { event: '*', schema: 'public', table: 'user_roles' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setUsers(prev => [payload.new as UserWithRole & { user_id: string }, ...prev])
+            setUsers(prev => [payload.new as UserWithHostAssignment, ...prev])
           } else if (payload.eventType === 'UPDATE') {
-            setUsers(prev => prev.map(u => u.user_id === (payload.new as UserWithRole & { user_id: string }).user_id ? payload.new as UserWithRole & { user_id: string } : u))
+            setUsers(prev => prev.map(u => u.user_id === (payload.new as UserWithHostAssignment).user_id ? payload.new as UserWithHostAssignment : u))
           } else if (payload.eventType === 'DELETE') {
-            setUsers(prev => prev.filter(u => u.user_id !== (payload.old as UserWithRole & { user_id: string }).user_id))
+            setUsers(prev => prev.filter(u => u.user_id !== (payload.old as UserWithHostAssignment).user_id))
           }
         }
       )
@@ -78,16 +81,29 @@ export default function UsersPage() {
 
   async function fetchUsers() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      showNotification('error', error.message)
-    } else {
-      setUsers(data || [])
-      fetchHostAssignments((data || []).map(u => u.user_id))
+    try {
+      const res = await fetch('/api/admin/users')
+      if (!res.ok) {
+        throw new Error(`Failed to fetch users: ${res.status}`)
+      }
+      const result = await res.json()
+      if (result.success) {
+        const usersData = result.data || []
+        setUsers(usersData)
+        const map: Record<string, { full_name: string | null; position: string | null; department: string | null }> = {}
+        usersData.forEach((u: { user_id: string; host_assignment?: { full_name?: string; position?: string; department?: string } | null }) => {
+          if (u.host_assignment) {
+            map[u.user_id] = {
+              full_name: u.host_assignment.full_name || null,
+              position: u.host_assignment.position || null,
+              department: u.host_assignment.department || null,
+            }
+          }
+        })
+        setHostAssignments(map)
+      }
+    } catch {
+      showNotification('error', 'Failed to fetch users')
     }
     setLoading(false)
   }
@@ -207,20 +223,14 @@ export default function UsersPage() {
     setCredentials(null)
   }
 
-  function handleEdit(user: UserWithRole & { user_id: string }) {
+  function handleEdit(user: UserWithHostAssignment) {
     setEditingUser(user)
     fetchCiEmployees()
     fetchDirectors()
 
     const loadAssignment = async () => {
       try {
-        const { data: assignment } = await supabase
-          .from('user_host_assignments')
-          .select('employee_id')
-          .eq('user_id', user.user_id)
-          .single()
-
-        const assignedEmployeeId = assignment?.employee_id || ''
+        const assignedEmployeeId = user.host_assignment?.employee_id || ''
 
         if (user.role === 'PA_TO_CI') {
           setFormData({
@@ -301,25 +311,6 @@ export default function UsersPage() {
     }
   }
 
-  async function fetchHostAssignments(userIds: string[]) {
-    if (userIds.length === 0) return
-
-    try {
-      const { data: assignments } = await supabase
-        .from('user_host_assignments')
-        .select('user_id, employee:employees(full_name, position, department)')
-        .in('user_id', userIds)
-
-      const map: Record<string, { full_name: string | null; position: string | null; department: string | null }> = {}
-      ;(assignments || []).forEach((a: any) => {
-        map[a.user_id] = a.employee || { full_name: null, position: null, department: null }
-      })
-      setHostAssignments(map)
-    } catch (err) {
-      console.error('Failed to fetch host assignments:', err)
-    }
-  }
-
   const filteredUsers = users.filter((u) => {
     const matchesSearch =
       u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -355,7 +346,7 @@ export default function UsersPage() {
         <div className="absolute inset-0 z-0">
           <img
             src="/images/afcsc-login.jpg"
-            alt="Armed Forces Command and Staff College background"
+            alt="Nigerian Army Aviation Command background"
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F08]/90 via-[#0B0F08]/70 to-[#0B0F08]/40" />
@@ -370,7 +361,7 @@ export default function UsersPage() {
       <div className="absolute inset-0 z-0">
         <img
           src="/images/afcsc-login.jpg"
-          alt="Armed Forces Command and Staff College background"
+          alt="Nigerian Army Aviation Command background"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F08]/90 via-[#0B0F08]/70 to-[#0B0F08]/40" />
@@ -711,5 +702,6 @@ export default function UsersPage() {
     </div>
   )
 }
+
 
 

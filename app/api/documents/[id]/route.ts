@@ -241,9 +241,9 @@ export async function POST(
         const document = await approveDocument(id, user.id, notes || undefined)
         await logAuditAction('Document Approved', 'visitor_document', id, `Document ${existing.document_type} approved for visitor ${existing.visitor_id}`)
 
-        admin.from('visitor_documents').select('visitor_id, visit_id').eq('id', id).single().then(({ data: doc }) => {
+        admin.from('visitor_documents').select('visitor_id, visit_id').eq('id', id).single().then(({ data: doc }: { data: { visitor_id: string; visit_id: string | null } | null }) => {
           if (doc?.visit_id) {
-            admin.from('visits').select('employee_id').eq('id', doc.visit_id).single().then(({ data: visit }) => {
+            admin.from('visits').select('employee_id').eq('id', doc.visit_id).single().then(({ data: visit }: { data: { employee_id: string } | null }) => {
               if (visit?.employee_id) {
                 createHostNotification(
                   visit.employee_id,
@@ -257,20 +257,20 @@ export async function POST(
           })
         }
         if (doc?.visitor_id) {
-          admin.from('visitors').select('email').eq('id', doc.visitor_id).single().then(({ data: visitor }) => {
-              if (visitor?.email) {
-                createSystemNotification(
-                  'Document Approved',
-                  `Your ${existing.document_type} has been approved.`,
-                  'success',
-                  'visitor_document',
-                  id
-                ).catch(() => {})
-              }
-            })
-          }
+          admin.from('visitors').select('email').eq('id', doc.visitor_id).single().then(({ data: visitor }: { data: { email: string } | null }) => {
+            if (visitor?.email) {
+              createSystemNotification(
+                'Document Approved',
+                `Your ${existing.document_type} has been approved.`,
+                'success',
+                'visitor_document',
+                id
+              ).catch(() => {})
+            }
+          })
+        }
         })
-
+        
        return NextResponse.json({ success: true, document })
        } catch (err: unknown) {
          return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: 'Internal server error' }, { status: 500 })
@@ -286,21 +286,21 @@ export async function POST(
          const document = await rejectDocument(id, user.id, reason)
          await logAuditAction('Document Rejected', 'visitor_document', id, `Document ${existing.document_type} rejected for visitor ${existing.visitor_id}`)
 
-        admin.from('visitor_documents').select('visitor_id').eq('id', id).single().then(({ data: doc }) => {
-          if (doc?.visitor_id) {
-            admin.from('visitors').select('email').eq('id', doc.visitor_id).single().then(({ data: visitor }) => {
-              if (visitor?.email) {
-                createSystemNotification(
-                  'Document Rejected',
-                  `Your ${existing.document_type} has been rejected. Reason: ${reason}`,
-                  'error',
-                  'visitor_document',
-                  id
-                ).catch(() => {})
-              }
-            })
-          }
-        })
+         admin.from('visitor_documents').select('visitor_id').eq('id', id).single().then(({ data: doc }: { data: { visitor_id: string } | null }) => {
+           if (doc?.visitor_id) {
+             admin.from('visitors').select('email').eq('id', doc.visitor_id).single().then(({ data: visitor }: { data: { email: string } | null }) => {
+               if (visitor?.email) {
+                 createSystemNotification(
+                   'Document Rejected',
+                   `Your ${existing.document_type} has been rejected. Reason: ${reason}`,
+                   'error',
+                   'visitor_document',
+                   id
+                 ).catch(() => {})
+               }
+             })
+           }
+         })
 
         return NextResponse.json({ success: true, document })
        } catch (err: unknown) {
@@ -317,9 +317,9 @@ export async function POST(
          const document = await requestReplacement(id, reason)
          await logAuditAction('Replacement Requested', 'visitor_document', id, `Replacement requested for document ${existing.document_type}`)
 
-        admin.from('visitor_documents').select('visitor_id').eq('id', id).single().then(({ data: doc }) => {
-          if (doc?.visitor_id) {
-            admin.from('visitors').select('email').eq('id', doc.visitor_id).single().then(({ data: visitor }) => {
+         admin.from('visitor_documents').select('visitor_id').eq('id', id).single().then(({ data: doc }: { data: { visitor_id: string } | null }) => {
+           if (doc?.visitor_id) {
+             admin.from('visitors').select('email').eq('id', doc.visitor_id).single().then(({ data: visitor }: { data: { email: string } | null }) => {
               if (visitor?.email) {
                 createSystemNotification(
                   'Replacement Requested',

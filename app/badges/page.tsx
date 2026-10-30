@@ -65,41 +65,32 @@ export default function BadgesPage() {
 
   const fetchBadges = async () => {
     setTimeout(() => setLoading(true), 0)
-    const { data, error } = await supabase
-      .from('visitor_badges')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      showNotification('error', error.message)
-    } else {
-      setBadges(data || [])
+    try {
+      const res = await fetch('/api/badges?limit=1000')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        showNotification('error', err.error || err.message || 'Failed to fetch badges')
+        return
+      }
+      const result = await res.json()
+      setBadges(result.data || [])
+    } catch (error) {
+      showNotification('error', error instanceof Error ? error.message : 'Failed to fetch badges')
+    } finally {
+      setTimeout(() => setLoading(false), 0)
     }
-
-    setTimeout(() => setLoading(false), 0)
   }
 
   const fetchVisits = async () => {
-    const { data, error } = await supabase
-      .from('visits')
-      .select('*, visitor:visitors(full_name, visitor_organization, photo_url), employee:employees(full_name, department)')
-      .in('status', ['approved', 'checked_in', 'checked_out'])
-      .order('created_at', { ascending: false })
-
-    if (!error && data) {
-      const visitIds = data.map(v => v.id)
-      const { data: badges } = await supabase
-        .from('visitor_badges')
-        .select('id, visit_id, badge_number, badge_status, qr_token, issued_at, expires_at, reprint_count')
-        .in('visit_id', visitIds)
-
-      const badgesByVisitId = new Map(badges?.map(b => [b.visit_id, b]) || [])
-      const visitsWithBadges = data.map(v => ({
-        ...v,
-        badge: badgesByVisitId.get(v.id) || null,
-      }))
-
-      setVisits(visitsWithBadges)
+    try {
+      const res = await fetch('/api/visits')
+      if (res.ok) {
+        const result = await res.json()
+        const visitsData = result.data || []
+        setVisits(visitsData.map((v: any) => ({ ...v, badge: null })))
+      }
+    } catch (error) {
+      // ignore
     }
   }
 
@@ -273,7 +264,7 @@ export default function BadgesPage() {
       <div className="absolute inset-0 z-0">
         <img
           src="/images/afcsc-login.jpg"
-          alt="Armed Forces Command and Staff College background"
+          alt="Nigerian Army Aviation Command background"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F08]/90 via-[#0B0F08]/70 to-[#0B0F08]/40" />
@@ -581,5 +572,6 @@ export default function BadgesPage() {
     </div>
   )
 }
+
 
 

@@ -462,7 +462,7 @@ export default function EmergencyPage() {
           <div className="flex items-center gap-3">
             <ImageWithFallback
               src="/images/afcsc-logo.png"
-              alt="Armed Forces Command and Staff College Logo"
+              alt="Nigerian Army Aviation Command Logo"
               className="h-8 w-8 object-contain"
             />
             <AlertTriangle className="h-8 w-8 text-red-600" />
@@ -842,4 +842,5 @@ export default function EmergencyPage() {
     </div>
   )
 }
+
 

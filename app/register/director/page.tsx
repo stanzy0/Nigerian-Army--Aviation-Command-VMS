@@ -42,7 +42,7 @@ export default function DirectorRegisterPage() {
                   priority
                 />
                 <div className="hidden sm:block">
-                  <p className="text-xs text-[#9A9F87] leading-tight">Armed Forces Command and Staff College</p>
+                  <p className="text-xs text-[#9A9F87] leading-tight">NA Avn Comd</p>
                   <p className="text-xs text-gray-400 leading-tight">Kaduna, Nigeria</p>
                 </div>
               </div>
@@ -93,7 +93,7 @@ export default function DirectorRegisterPage() {
                 priority
               />
               <div className="hidden sm:block">
-                <p className="text-xs text-[#9A9F87] leading-tight">Armed Forces Command and Staff College</p>
+                <p className="text-xs text-[#9A9F87] leading-tight">NA Avn Comd</p>
                 <p className="text-xs text-gray-400 leading-tight">Kaduna, Nigeria</p>
               </div>
             </div>
@@ -112,3 +112,4 @@ export default function DirectorRegisterPage() {
     </div>
   )
 }
+

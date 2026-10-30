@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     .select('user_id')
     .eq('role', 'Director')
 
-  const directorUserIds = (directorUsers || []).map(u => u.user_id)
+  const directorUserIds = (directorUsers || []).map((u: { user_id: string }) => u.user_id)
 
   // Build query for Director employees
   let query = supabaseAdmin
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     }
 
     const filtered = search
-      ? (employees || []).filter(e =>
+      ? (employees || []).filter((e: { full_name?: string; position?: string; department?: string }) =>
           (e.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
           (e.position || '').toLowerCase().includes(search.toLowerCase()) ||
           (e.department || '').toLowerCase().includes(search.toLowerCase())

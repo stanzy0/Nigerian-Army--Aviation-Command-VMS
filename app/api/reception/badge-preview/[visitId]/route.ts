@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth-helpers'
 import { getVisitForBadgePreview, getBadgeTemplates } from '@/lib/server/badge-preview'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isDemoMode } from '@/lib/demo'
+import { getCurrentUser } from '@/lib/auth'
 import { logAuditAction } from '@/lib/server/audit'
 import { buildPortalQrUrl } from '@/lib/utils/portal-url'
 import QRCode from 'qrcode'
 import { sendEmail } from '@/lib/server/email'
 import { createHostNotification, createSystemNotification, createReceptionistNotification, createSecurityNotification } from '@/lib/server/notification-service'
 import { getDocumentVerifications } from '@/lib/server/document-verification'
+import { applyVisitStatusChange, type VisitStatus } from '@/lib/server/visit-status'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ visitId: string }> }) {
   const authResult = await requireRole(['Admin', 'Receptionist'])
@@ -51,9 +54,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, message: '', error: '' }, { status: 400 })
     }
 
+    if (isDemoMode()) {
+      return NextResponse.json({ success: true, data: { badge_number: 'DEMO-BADGE', qr_token: 'demo-token' } })
+    }
+
     if (!supabaseAdmin) {
       return NextResponse.json({ success: false, message: 'Server configuration error', error: 'Service role key not configured' }, { status: 500 })
     }
+
+    const currentUser = await getCurrentUser()
+    const actorUserId = currentUser?.id ?? null
 
     const { data: visit, error: fetchError } = await supabaseAdmin
       .from('visits')
@@ -113,17 +123,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: '' }, { status: 500 })
       }
 
-      const { error: updateError } = await supabaseAdmin
-        .from('visits')
-        .update({ status: 'approved' })
-        .eq('id', visitId)
+      // Use the atomic status-change function for pending -> approved transition.
+      const result = await applyVisitStatusChange(visitId, 'approved', {
+        auditAction: 'Badge Approved',
+        auditDetails: `Registration ${visit.registration_number} approved and badge ${badge.badge_number} generated`,
+        approvedBy: actorUserId,
+      })
 
-      if (updateError) {
-        return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: '' }, { status: 500 })
+      if (result.outcome !== 'success') {
+        return NextResponse.json({ success: false, message: result.message, error: result.outcome }, { status: 409 })
       }
 
-        const portalUrl = buildPortalQrUrl(badge.qr_token)
-        const qrDataUrl = await QRCode.toDataURL(portalUrl, { width: 300, margin: 2 })
+      const portalUrl = buildPortalQrUrl(badge.qr_token)
+      const qrDataUrl = await QRCode.toDataURL(portalUrl, { width: 300, margin: 2 })
 
       await sendEmail({
         to: visitor?.email || '',
@@ -133,8 +145,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data: {
           visitorName: visitor?.full_name || 'Visitor',
           registrationNumber: visit.registration_number,
-          date: visit.visit_date || new Date().toISOString().split('T')[0],
-          arrivalTime: visit.arrival_time || 'TBD',
+          date: visit.scheduled_date ? new Date(visit.scheduled_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          arrivalTime: 'TBD',
           hostName: employee?.full_name || 'Host',
           location: employee?.office_location || 'Reception',
           badgeNumber: badge.badge_number,
@@ -148,7 +160,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         await createHostNotification(
           employee.user_id,
           'Visitor Registration Approved',
-          `${visitor?.full_name || 'A visitor'}'s registration has been approved for ${visit.visit_date || 'today'}.`,
+          `${visitor?.full_name || 'A visitor'}'s registration has been approved for ${visit.scheduled_date ? new Date(visit.scheduled_date).toISOString().split('T')[0] : 'today'}.`,
           'visitor',
           'visit',
           visitId
@@ -186,13 +198,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     if (action === 'reject') {
-      const { error: updateError } = await supabaseAdmin
-        .from('visits')
-        .update({ status: 'rejected', rejection_reason: reason || null })
-        .eq('id', visitId)
+      const result = await applyVisitStatusChange(visitId, 'rejected', {
+        rejectionReason: reason || null,
+        auditAction: 'Badge Rejected',
+        auditDetails: `Registration ${visit.registration_number} rejected. Reason: ${reason || 'None'}`,
+        approvedBy: actorUserId,
+      })
 
-      if (updateError) {
-        return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: '' }, { status: 500 })
+      if (result.outcome !== 'success') {
+        return NextResponse.json({ success: false, message: result.message, error: result.outcome }, { status: 409 })
       }
 
       await sendEmail({
@@ -203,7 +217,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data: {
           visitorName: visitor?.full_name || 'Visitor',
           registrationNumber: visit.registration_number,
-          date: visit.visit_date || new Date().toISOString().split('T')[0],
+          date: visit.scheduled_date ? new Date(visit.scheduled_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           hostName: employee?.full_name || 'Host',
           reason: reason || 'Not specified',
         },

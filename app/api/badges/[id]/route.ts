@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { requireAdmin, requireRole } from '@/lib/auth-helpers'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isDemoMode } from '@/lib/demo'
 
 export async function GET(
   request: NextRequest,
@@ -39,17 +40,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authResult = await requireRole(['Admin', 'Receptionist'])
-  if (!authResult.authorized) {
-    return NextResponse.json({ success: false, message: authResult.error, error: authResult.error }, { status: authResult.status })
-  }
-
   try {
     const { id } = await params
-
-    if (!supabaseAdmin) {
-      return NextResponse.json({ success: false, message: 'Server configuration error', error: 'Service role key not configured' }, { status: 500 })
-    }
 
     let body
     try {
@@ -64,6 +56,23 @@ export async function POST(
     }
 
     const { action } = body
+
+    if (isDemoMode()) {
+      return NextResponse.json({
+        success: true,
+        demo: true,
+        message: `Demo mode: badge ${action} (not persisted)`,
+      })
+    }
+
+    const authResult = await requireRole(['Admin', 'Receptionist'])
+    if (!authResult.authorized) {
+      return NextResponse.json({ success: false, message: authResult.error, error: authResult.error }, { status: authResult.status })
+    }
+
+    if (!supabaseAdmin) {
+      return NextResponse.json({ success: false, message: 'Server configuration error', error: 'Service role key not configured' }, { status: 500 })
+    }
 
     if (action === 'print') {
       const { data: badge } = await supabaseAdmin

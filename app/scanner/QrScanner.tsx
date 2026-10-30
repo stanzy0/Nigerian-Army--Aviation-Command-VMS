@@ -196,12 +196,13 @@ export default function QrScanner() {
         logAuditAction('QR Code Scanned', 'visit', visitData.id, `QR scanned for visitor ${visitData.visitor?.full_name}`)
 
         if (visitData.status === 'approved') {
-          const { error: updateError } = await supabase
-            .from('visits')
-            .update({ status: 'checked_in', check_in_time: new Date().toISOString() })
-            .eq('id', visitData.id)
+          const checkInRes = await fetch(`/api/visits/${visitData.id}/status?id=${visitData.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'checked_in' }),
+          })
 
-          if (!updateError) {
+          if (checkInRes.ok) {
             logAuditAction('Visitor Checked In', 'visit', visitData.id, `${visitData.visitor?.full_name} checked in`)
             setScanResult({ ...visitData, status: 'checked_in', check_in_time: new Date().toISOString() })
             setNotification({ type: 'success', message: 'Visitor Checked In Successfully' })
@@ -239,12 +240,13 @@ export default function QrScanner() {
         logAuditAction('QR Code Scanned', 'visit', visitData.id, `QR scanned for visitor ${visitData.visitor?.full_name}`)
 
         if (visitData.status === 'approved') {
-          const { error: updateError } = await supabase
-            .from('visits')
-            .update({ status: 'checked_in', check_in_time: new Date().toISOString() })
-            .eq('id', visitData.id)
+          const checkInRes = await fetch(`/api/visits/${visitData.id}/status?id=${visitData.id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'checked_in' }),
+          })
 
-          if (!updateError) {
+          if (checkInRes.ok) {
             logAuditAction('Visitor Checked In', 'visit', visitData.id, `${visitData.visitor?.full_name} checked in`)
             setScanResult({ ...visitData, status: 'checked_in', check_in_time: new Date().toISOString() })
             setNotification({ type: 'success', message: 'Visitor Checked In Successfully' })
@@ -490,12 +492,21 @@ export default function QrScanner() {
               {scanResult.status === 'approved' && (
                 <button
                   onClick={async () => {
-                    const { error } = await supabase.from('visits').update({ status: 'checked_in', check_in_time: new Date().toISOString() }).eq('id', scanResult.id)
-                    if (!error) {
-                      logAuditAction('Visitor Checked In', 'visit', scanResult.id, `${scanResult.visitor?.full_name} checked in`)
-                      setScanResult({ ...scanResult, status: 'checked_in', check_in_time: new Date().toISOString() })
-                      setNotification({ type: 'success', message: 'Visitor Checked In Successfully' })
+                    const checkInRes = await fetch(`/api/visits/status?id=${encodeURIComponent(scanResult.id)}`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: 'checked_in' }),
+                    })
+
+                    if (!checkInRes.ok) {
+                      const errData = await checkInRes.json().catch(() => ({}))
+                      console.error('Check-in failed:', errData.message || 'Unknown error')
+                      return
                     }
+
+                    logAuditAction('Visitor Checked In', 'visit', scanResult.id, `${scanResult.visitor?.full_name} checked in`)
+                    setScanResult({ ...scanResult, status: 'checked_in', check_in_time: new Date().toISOString() })
+                    setNotification({ type: 'success', message: 'Visitor Checked In Successfully' })
                   }}
                   className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
@@ -505,12 +516,21 @@ export default function QrScanner() {
               {scanResult.status === 'checked_in' && (
                 <button
                   onClick={async () => {
-                    const { error } = await supabase.from('visits').update({ status: 'checked_out', check_out_time: new Date().toISOString() }).eq('id', scanResult.id)
-                    if (!error) {
-                      logAuditAction('Visitor Checked Out', 'visit', scanResult.id, `${scanResult.visitor?.full_name} checked out`)
-                      setScanResult({ ...scanResult, status: 'checked_out', check_out_time: new Date().toISOString() })
-                      setNotification({ type: 'success', message: 'Visitor Checked Out Successfully' })
+                    const checkOutRes = await fetch(`/api/visits/status?id=${encodeURIComponent(scanResult.id)}`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: 'checked_out' }),
+                    })
+
+                    if (!checkOutRes.ok) {
+                      const errData = await checkOutRes.json().catch(() => ({}))
+                      console.error('Check-out failed:', errData.message || 'Unknown error')
+                      return
                     }
+
+                    logAuditAction('Visitor Checked Out', 'visit', scanResult.id, `${scanResult.visitor?.full_name} checked out`)
+                    setScanResult({ ...scanResult, status: 'checked_out', check_out_time: new Date().toISOString() })
+                    setNotification({ type: 'success', message: 'Visitor Checked Out Successfully' })
                   }}
                   className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
                 >

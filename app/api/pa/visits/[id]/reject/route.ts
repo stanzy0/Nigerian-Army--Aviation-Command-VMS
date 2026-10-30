@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getCurrentUser } from '@/lib/auth'
+import { isDemoMode } from '@/lib/demo'
 import { getAssignedHostEmployeeForPA } from '@/lib/server/pa-helpers'
-import { applyVisitStatusChange, InvalidTransitionError } from '@/lib/server/visit-status'
+import { applyVisitStatusChange, type VisitStatus } from '@/lib/server/visit-status'
 
 export async function POST(
   request: NextRequest,
@@ -13,6 +14,10 @@ export async function POST(
   const user = await getCurrentUser()
   if (!user) {
     return NextResponse.json({ success: false, message: 'Unauthorized', error: '' }, { status: 401 })
+  }
+
+  if (isDemoMode()) {
+    return NextResponse.json({ success: true, data: { visit_id: id, status: 'rejected', message: 'Demo mode: rejection simulated' } })
   }
 
   if (!supabaseAdmin) {
@@ -70,19 +75,24 @@ export async function POST(
     // No body / invalid JSON — rejection without a reason is allowed.
   }
 
-  try {
-    const updatedVisit = await applyVisitStatusChange(id, 'rejected', {
-      rejectionReason,
-      auditAction: 'Visitor Rejected',
-      auditDetails: `PA (${role}) rejected ${visitorFullName || 'visitor'}'s visit${rejectionReason ? `: ${rejectionReason}` : ''}`,
-    })
+  const result = await applyVisitStatusChange(id, 'rejected', {
+    rejectionReason,
+    auditAction: 'Visitor Rejected',
+    auditDetails: `PA (${role}) rejected ${visitorFullName || 'visitor'}'s visit${rejectionReason ? `: ${rejectionReason}` : ''}`,
+    approvedBy: user.id,
+  })
 
-    return NextResponse.json({ success: true, data: updatedVisit })
-  } catch (err) {
-    if (err instanceof InvalidTransitionError) {
-      return NextResponse.json({ success: false, message: err.message, error: 'invalid_transition' }, { status: 422 })
-    }
-    console.error('PA reject error:', err)
-    return NextResponse.json({ success: false, message: 'Failed to reject visitor', error: 'internal' }, { status: 500 })
+  switch (result.outcome) {
+    case 'not_found':
+      return NextResponse.json({ success: false, message: 'Visit not found', error: 'not_found' }, { status: 404 })
+    case 'authorization':
+      return NextResponse.json({ success: false, message: result.message, error: 'forbidden' }, { status: 403 })
+    case 'invalid_transition':
+      return NextResponse.json({ success: false, message: result.message, error: 'invalid_transition' }, { status: 409 })
+    case 'success':
+      // Outbox events are now enqueued transactionally by the atomic DB function.
+      return NextResponse.json({ success: true, data: result })
+    default:
+      return NextResponse.json({ success: false, message: 'Unexpected outcome', error: 'internal' }, { status: 500 })
   }
 }

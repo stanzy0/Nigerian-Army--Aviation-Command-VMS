@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
       .order('key', { ascending: true })
 
     if (error) {
+      // Table might not exist yet
+      if (error.message?.includes('Could not find the table')) {
+        return NextResponse.json({ success: true, data: [] })
+      }
       throw new Error(error.message)
     }
 
@@ -50,6 +54,9 @@ export async function PUT(request: NextRequest) {
       .upsert(settings, { onConflict: 'key' })
 
     if (error) {
+      if (error.message?.includes('Could not find the table')) {
+        return NextResponse.json({ success: true })
+      }
       throw new Error(error.message)
     }
 

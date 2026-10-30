@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isDemoMode } from '@/lib/demo'
 import { logAuditAction } from '@/lib/server/audit'
 
 export interface OperationsKpis {
@@ -674,15 +675,23 @@ export async function getActiveProperty(): Promise<ActivePropertyItem[]> {
 }
 
 export async function forceCheckout(visitId: string, performedBy: string | null): Promise<boolean> {
+  if (isDemoMode()) {
+    await logAuditAction('Force Check-out', 'visit', visitId, `Force check-out performed on visit ${visitId} (demo mode)`)
+    return true
+  }
+
   if (!supabaseAdmin) return false
 
-  const { error } = await supabaseAdmin
-    .from('visits')
-    .update({ status: 'checked_out', check_out_time: new Date().toISOString() })
-    .eq('id', visitId)
+  // Use the atomic status-change function for checked_in -> checked_out transition.
+  const { applyVisitStatusChange } = await import('./visit-status')
+  const result = await applyVisitStatusChange(visitId, 'checked_out', {
+    auditAction: 'Force Check-out',
+    auditDetails: `Force check-out performed on visit ${visitId}`,
+    approvedBy: performedBy,
+  })
 
-  if (error) {
-    console.error('Force checkout error:', error)
+  if (result.outcome !== 'success') {
+    console.error('Force checkout error:', result.message)
     return false
   }
 

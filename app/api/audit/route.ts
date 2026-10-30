@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isDemoMode } from '@/lib/demo'
 
 export async function POST(request: NextRequest) {
+  if (isDemoMode()) {
+    return NextResponse.json({ success: true })
+  }
   const user = await getCurrentUser()
 
   if (!user) {

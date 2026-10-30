@@ -4,6 +4,8 @@ import { getCurrentUser } from '@/lib/auth'
 import { logAuditAction } from '@/lib/server/audit'
 import { VisitorDocument, DOCUMENT_TYPES, ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from '@/lib/types/document'
 import { createAdminNotification, createReceptionistNotification, createHostNotification, createSystemNotification } from '@/lib/server/notification-service'
+import { requireRole } from '@/lib/auth-helpers'
+import { isDemoMode } from '@/lib/demo'
 
 function mapToDocumentVerification(doc: any) {
   return {
@@ -28,6 +30,9 @@ function mapToDocumentVerification(doc: any) {
 }
 
 export async function GET(request: NextRequest) {
+  if (isDemoMode()) {
+    return NextResponse.json({ success: true, data: [], total: 0 })
+  }
   try {
     const user = await getCurrentUser()
     if (!user) {
@@ -77,7 +82,7 @@ export async function GET(request: NextRequest) {
     const mappedData = (data || []).map(mapToDocumentVerification)
 
     // Fetch visit data separately for documents that have a visit_id
-    const visitIds = [...new Set(mappedData.map(d => d.visit_id).filter(Boolean))]
+    const visitIds = [...new Set(mappedData.map((d: { visit_id?: string }) => d.visit_id).filter(Boolean))]
     if (visitIds.length > 0) {
       const { data: visits } = await supabaseAdmin
         .from('visits')
@@ -105,7 +110,13 @@ export async function GET(request: NextRequest) {
       offset,
     })
   } catch (err) {
-    console.error('[Documents API] GET error:', err)
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    const errorStack = err instanceof Error ? err.stack : ''
+    console.error('[Documents API] GET error:', { message: errorMessage, stack: errorStack, timestamp: new Date().toISOString() })
+    // Return error details in development for debugging
+    if (process.env.NODE_ENV === 'development') {
+      return NextResponse.json({ success: false, message: errorMessage, error: errorStack }, { status: 500 })
+    }
     return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -234,7 +245,7 @@ export async function POST(request: NextRequest) {
     ).catch(() => {})
 
     if (visit_id) {
-      supabaseAdmin.from('visits').select('employee_id').eq('id', visit_id).single().then(({ data: visit }) => {
+      supabaseAdmin.from('visits').select('employee_id').eq('id', visit_id).single().then(({ data: visit }: { data: { employee_id?: string } | null }) => {
         if (visit?.employee_id) {
           createHostNotification(
             visit.employee_id,

@@ -168,34 +168,44 @@ export default function KioskPage() {
 
   const handleCheckIn = async (visitId: string) => {
     setActionLoading(visitId)
-    const { error } = await supabase
-      .from('visits')
-      .update({ status: 'checked_in', check_in_time: new Date().toISOString() })
-      .eq('id', visitId)
-
-    if (error) {
-      showNotification('error', error.message)
-    } else {
-      setRecentVisits(prev => prev.map(v => v.id === visitId ? { ...v, status: 'checked_in', check_in_time: new Date().toISOString() } : v))
-      fetchStats()
-      showNotification('success', 'Visitor checked in')
+    try {
+      const res = await fetch(`/api/visits/${visitId}/status?id=${visitId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'checked_in' }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.success) {
+        showNotification('error', json.message || 'Check-in failed')
+      } else {
+        setRecentVisits(prev => prev.map(v => v.id === visitId ? { ...v, status: 'checked_in', check_in_time: new Date().toISOString() } : v))
+        fetchStats()
+        showNotification('success', 'Visitor checked in')
+      }
+    } catch {
+      showNotification('error', 'Check-in failed')
     }
     setActionLoading(null)
   }
 
   const handleCheckOut = async (visitId: string) => {
     setActionLoading(visitId)
-    const { error } = await supabase
-      .from('visits')
-      .update({ status: 'checked_out', check_out_time: new Date().toISOString() })
-      .eq('id', visitId)
-
-    if (error) {
-      showNotification('error', error.message)
-    } else {
-      setRecentVisits(prev => prev.map(v => v.id === visitId ? { ...v, status: 'checked_out', check_out_time: new Date().toISOString() } : v))
-      fetchStats()
-      showNotification('success', 'Visitor checked out')
+    try {
+      const res = await fetch(`/api/visits/${visitId}/status?id=${visitId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'checked_out' }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.success) {
+        showNotification('error', json.message || 'Check-out failed')
+      } else {
+        setRecentVisits(prev => prev.map(v => v.id === visitId ? { ...v, status: 'checked_out', check_out_time: new Date().toISOString() } : v))
+        fetchStats()
+        showNotification('success', 'Visitor checked out')
+      }
+    } catch {
+      showNotification('error', 'Check-out failed')
     }
     setActionLoading(null)
   }

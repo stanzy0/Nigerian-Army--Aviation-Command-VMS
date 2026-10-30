@@ -101,16 +101,28 @@ export default function SettingsPage() {
 
   async function fetchSettings() {
     setLoading(true)
-    const { data } = await supabase.from('system_settings').select('*')
-
-    const map: Record<string, SettingRow> = {}
-    DEFAULT_SETTINGS.forEach((def) => {
-      const existing = data?.find((s) => s.key === def.key)
-      map[def.key] = existing || { ...def }
-    })
-
-    setSettings(map)
-    setLoading(false)
+    try {
+      const res = await fetch('/api/admin/settings')
+      if (res.ok) {
+        const result = await res.json()
+        const data = result.data || []
+        const map: Record<string, SettingRow> = {}
+        DEFAULT_SETTINGS.forEach((def) => {
+          const existing = data?.find((s: any) => s.key === def.key)
+          map[def.key] = existing ? { ...def, value: existing.value } : { ...def }
+        })
+        setSettings(map)
+      }
+    } catch (err) {
+      console.error('Failed to fetch settings:', err)
+      const map: Record<string, SettingRow> = {}
+      DEFAULT_SETTINGS.forEach((def) => {
+        map[def.key] = { ...def }
+      })
+      setSettings(map)
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function fetchEmailStatus() {
@@ -134,20 +146,20 @@ export default function SettingsPage() {
   }
 
   async function fetchAuditInfo() {
-    const { data } = await supabase
-      .from('audit_logs')
-      .select('action, created_at')
-      .or('action.ilike.%Backup%,action.ilike.%Settings%,action.ilike.%Login%')
-      .order('created_at', { ascending: false })
-      .limit(10)
-
-    if (data) {
-      const backup = data.find((l) => l.action.toLowerCase().includes('backup'))
-      const config = data.find((l) => l.action.toLowerCase().includes('settings'))
-      const login = data.find((l) => l.action.toLowerCase().includes('login'))
-      setLastBackup(backup ? new Date(backup.created_at).toLocaleString() : null)
-      setLastConfigChange(config ? new Date(config.created_at).toLocaleString() : null)
-      setLastLogin(login ? new Date(login.created_at).toLocaleString() : null)
+    try {
+      const res = await fetch('/api/admin/audit-logs?limit=20')
+      if (res.ok) {
+        const result = await res.json()
+        const data = result.data || []
+        const backup = data.find((l: any) => l.action?.toLowerCase().includes('backup'))
+        const config = data.find((l: any) => l.action?.toLowerCase().includes('settings'))
+        const login = data.find((l: any) => l.action?.toLowerCase().includes('login'))
+        setLastBackup(backup ? new Date(backup.created_at).toLocaleString() : null)
+        setLastConfigChange(config ? new Date(config.created_at).toLocaleString() : null)
+        setLastLogin(login ? new Date(login.created_at).toLocaleString() : null)
+      }
+    } catch (err) {
+      console.error('Failed to fetch audit info:', err)
     }
   }
 
@@ -181,15 +193,21 @@ export default function SettingsPage() {
       updated_by: user?.id,
     }))
 
-    const { error } = await supabase.from('system_settings').upsert(entries, { onConflict: 'key' })
-
-    if (error) {
-      console.error('Error saving settings:', error)
-    } else {
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entries),
+      })
+      if (!res.ok) {
+        throw new Error('Failed to save')
+      }
       await logAuditAction('Settings Updated', 'system_settings', null, 'System configuration updated')
+    } catch (error) {
+      console.error('Error saving settings:', error)
+    } finally {
+      setSaving(false)
     }
-
-    setSaving(false)
   }
 
   function handleExportConfig() {
@@ -219,6 +237,7 @@ export default function SettingsPage() {
         })
         setSettings(newSettings)
         logAuditAction('Settings Imported', 'system_settings', null, 'Configuration imported')
+        fetchSettings()
       } catch (err) {
         console.error('Invalid settings file:', err)
       }
@@ -304,7 +323,7 @@ export default function SettingsPage() {
         <div className="absolute inset-0 z-0">
           <img
             src="/images/afcsc-login.jpg"
-            alt="Armed Forces Command and Staff College background"
+            alt="Nigerian Army Aviation Command background"
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F08]/90 via-[#0B0F08]/70 to-[#0B0F08]/40" />
@@ -319,7 +338,7 @@ export default function SettingsPage() {
       <div className="absolute inset-0 z-0">
         <img
           src="/images/afcsc-login.jpg"
-          alt="Armed Forces Command and Staff College background"
+          alt="Nigerian Army Aviation Command background"
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F08]/90 via-[#0B0F08]/70 to-[#0B0F08]/40" />
@@ -563,5 +582,6 @@ export default function SettingsPage() {
     </div>
   )
 }
+
 
 

@@ -841,7 +841,7 @@ const isStepInvalid = () => {
   const formTitle = isDirector ? 'DIRECTOR' : 'Visitor Registration'
   const formSubtitle = isDirector
     ? 'DEPARTMENT OF LAND WARFARE\nVISITORS FORM'
-    : 'Armed Forces Command and Staff College · Kaduna, Nigeria'
+    : 'NA Avn Comd · Kaduna, Nigeria'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1480,7 +1480,7 @@ const isStepInvalid = () => {
               <div className="flex items-start gap-2">
                 <input type="checkbox" id="accept_terms" checked={formData.accept_terms} onChange={(e) => updateField('accept_terms', e.target.checked)} className="h-4 w-4 mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
                 <label htmlFor="accept_terms" className="text-sm text-gray-600">
-                  I confirm that the information provided is accurate and I agree to abide by the visitor guidelines of the Armed Forces Command and Staff College.
+                  I confirm that the information provided is accurate and I agree to abide by the visitor guidelines of the NA Avn Comd.
                 </label>
               </div>
             </div>
@@ -1531,4 +1531,5 @@ function ReviewRow({ label, value }: { label: string; value: string | boolean | 
     </div>
   )
 }
+
 
