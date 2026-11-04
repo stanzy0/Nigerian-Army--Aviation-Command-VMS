@@ -64,6 +64,7 @@ export default function ReportsDashboardPage() {
     const checkAuth = async () => {
       const user = await getCurrentUser()
       if (!user) { window.location.href = '/login'; return }
+      if (!user.role) { window.location.href = '/unauthorized'; return }
       if (!PERMISSIONS[user.role]?.includes('reports')) { window.location.href = '/unauthorized'; return }
       setAuthChecking(false)
       logAuditAction('Analytics Viewed', 'report', null, 'User viewed analytics dashboard')

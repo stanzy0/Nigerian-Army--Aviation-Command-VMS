@@ -162,6 +162,10 @@ export default function ReceptionPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       const allowed = ['Admin', 'Receptionist', 'Security', 'PA_TO_DIRECTOR', 'PA_TO_CI']
       if (!allowed.includes(user.role)) {
         window.location.href = '/unauthorized'

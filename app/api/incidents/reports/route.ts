@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
     }
 
     const allowedRoles = ['Admin', 'Security', 'Operations', 'Commandant']
-    if (!allowedRoles.includes(user.role)) {
+    const userRole = user.role
+    if (!userRole || !allowedRoles.includes(userRole)) {
       return NextResponse.json({ success: false, message: 'Insufficient permissions', error: 'Forbidden' }, { status: 403 })
     }
 

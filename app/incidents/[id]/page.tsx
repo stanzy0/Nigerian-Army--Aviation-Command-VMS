@@ -98,6 +98,10 @@ export default function IncidentDetailPage({ params }: { params: { id: string } 
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       const allowedRoles = ['Admin', 'Security', 'Operations', 'Receptionist', 'Commandant']
       if (!allowedRoles.includes(user.role)) {
         window.location.href = '/unauthorized'

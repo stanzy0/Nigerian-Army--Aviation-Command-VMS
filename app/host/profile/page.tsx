@@ -59,15 +59,19 @@ export default function HostProfilePage() {
   }
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const user = await getCurrentUser()
-      if (!user) {
-        window.location.href = '/login'
-        return
-      }
-      setUserRole(user.role)
+  const checkAuth = async () => {
+    const user = await getCurrentUser()
+    if (!user) {
+      window.location.href = '/login'
+      return
+    }
+    if (!user.role) {
+      window.location.href = '/unauthorized'
+      return
+    }
+    setUserRole(user.role)
 
-      if (user.role === 'Host Employee') {
+    if (user.role === 'Host Employee') {
         const { data: empData } = await supabase
           .from('employees')
           .select('id')

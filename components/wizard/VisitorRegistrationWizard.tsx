@@ -260,121 +260,49 @@ export default function VisitorRegistrationWizard({ onComplete }: { onComplete?:
         docBackUrl = backPublic.publicUrl
       }
 
-      const { data: employeeData } = await supabase
-        .from('employees')
-        .select('office_location, full_name')
-        .eq('id', formData.host_employee_id)
-        .single()
-
-      const officeLocation = employeeData?.office_location || null
-
-      const visitorPayload: Record<string, unknown> = {
-        full_name: formData.full_name,
-        email: formData.email,
-        phone: formData.phone,
-        visitor_address: formData.visitor_address,
-        nationality: formData.nationality,
-        gender: formData.gender,
-        photo_url: formData.photo_url || null,
-        emergency_contact: formData.emergency_contact,
-        vehicle_plate: formData.registration_number,
-        vehicle_type: formData.vehicle_type,
-        host_employee_id: formData.host_employee_id,
-        purpose: formData.purpose === 'Other' ? formData.custom_purpose : formData.purpose,
-        expected_duration: formData.expected_duration || 0,
-        created_by: user.id,
-        visitor_type: visitorType,
-        doc_type: formData.doc_type,
-        doc_number: formData.doc_number,
-        issuing_country: formData.issuing_country || null,
-        expiry_date: formData.expiry_date || null,
-        doc_front_url: docFrontUrl,
-        doc_back_url: docBackUrl,
-        doc_notes: formData.doc_notes || null,
-      }
-
-      const { data: visitor, error: visitorError } = await supabase
-        .from('visitors')
-        .insert(visitorPayload)
-        .select()
-        .single()
-
-      if (visitorError || !visitor) {
-        setError(visitorError?.message || 'Failed to create visitor')
-        setSubmitting(false)
-        return
-      }
-
-      const regNumber = `REG-${Date.now().toString(36).toUpperCase()}`
-
-      const { data: visit, error: visitError } = await supabase
-        .from('visits')
-        .insert({
-          visitor_id: visitor.id,
-          employee_id: formData.host_employee_id,
-          purpose: formData.purpose === 'Other' ? formData.custom_purpose : formData.purpose,
-          status: 'pending',
-          source: 'internal',
-          registration_number: regNumber,
-          visitor_type: visitorType,
-          office_location: officeLocation,
-          notes: formData.notes || null,
+      const res = await fetch('/api/public/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: formData.full_name,
+          email: formData.email,
+          phone: formData.phone,
           is_pre_arranged: formData.is_pre_arranged ?? false,
-        })
-        .select()
-        .single()
-
-      if (visitError || !visit) {
-        setError(visitError?.message || 'Failed to create visit')
-        setSubmitting(false)
-        return
-      }
-
-      if (docFrontUrl) {
-        await supabase.from('visitor_documents').insert({
-          visitor_id: visitor.id,
-          document_type: formData.doc_type,
-          document_number: formData.doc_number,
+          nationality: formData.nationality,
+          visitor_address: formData.visitor_address,
+          gender: formData.gender,
+          photo_url: docFrontUrl || formData.photo_url || null,
+          doc_type: formData.doc_type,
+          doc_number: formData.doc_number,
           issuing_country: formData.issuing_country || null,
           expiry_date: formData.expiry_date || null,
-          front_image_url: docFrontUrl,
-          file_url: docFrontUrl,
-          back_image_url: docBackUrl || null,
-          verified: false,
-          verification_status: 'Pending',
-        })
+          doc_front_url: docFrontUrl,
+          doc_back_url: docBackUrl || null,
+          employee_id: formData.host_employee_id,
+          purpose: formData.purpose === 'Other' ? formData.custom_purpose : formData.purpose,
+          visit_date: formData.visit_date,
+          arrival_time: formData.arrival_time || null,
+          expected_duration: formData.expected_duration || 0,
+          has_vehicle: !!formData.registration_number,
+          registration_number: formData.registration_number || null,
+          vehicle_type: formData.vehicle_type || null,
+          vehicle_color: formData.vehicle_color || null,
+          emergency_name: formData.emergency_contact,
+          emergency_relationship: formData.emergency_relationship || null,
+          emergency_phone: formData.emergency_phone || null,
+          notes: formData.doc_notes || formData.notes || null,
+          visitor_type: visitorType,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        setError(err.message || 'Failed to submit registration')
+        setSubmitting(false)
+        return
       }
 
-      try {
-        const registrationNumber = visit.registration_number || regNumber
-        await fetch('/api/notifications', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: 'New Visitor Registration',
-            message: `${visitor.full_name} has been registered for ${employeeData?.full_name || 'a host'} (${registrationNumber}).`,
-            type: 'visitor',
-            recipientRole: 'PA_TO_CI',
-            relatedType: 'visit',
-            relatedId: visit.id,
-          }),
-        })
-
-        await fetch('/api/notifications', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: 'New Visitor Registration',
-            message: `${visitor.full_name} has been registered for ${employeeData?.full_name || 'a host'} (${registrationNumber}).`,
-            type: 'visitor',
-            recipientRole: 'PA_TO_DIRECTOR',
-            relatedType: 'visit',
-            relatedId: visit.id,
-          }),
-        })
-      } catch {
-        // notification delivery failure should not block registration
-      }
+      const result = await res.json()
 
       onComplete?.()
     } catch {

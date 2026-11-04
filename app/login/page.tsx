@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { isDemoMode } from '@/lib/demo'
 import { createClient } from '@/lib/supabase/client'
-import { ensureUserInDatabase } from '@/lib/auth-client'
 import { logAuditAction } from '@/lib/client/audit'
 import ImageWithFallback from '@/components/ui/ImageWithFallback'
 import Link from 'next/link'
@@ -128,8 +127,6 @@ export default function LoginPage() {
         return
       }
 
-      await ensureUserInDatabase(data.user.id, data.user.email || '')
-
       if (rememberDevice) {
         const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         document.cookie = `remember_device=true; expires=${expiresAt.toUTCString()}; path=/; SameSite=Lax`
@@ -144,7 +141,22 @@ export default function LoginPage() {
 
       const roleRes = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' })
       const roleData = roleRes.ok ? await roleRes.json() : { success: false }
-      const role = roleData.success ? roleData.data?.role : null
+      if (!roleRes.ok) {
+        setError('Unable to verify your session. Please try again.')
+        setLoading(false)
+        return
+      }
+      if (!roleData.success) {
+        setError('Unable to verify your account. Please contact support.')
+        setLoading(false)
+        return
+      }
+      const role = roleData.data?.role
+      if (roleData.data?.missingRole) {
+        setError('Your account does not have an assigned role. Please contact an administrator.')
+        setLoading(false)
+        return
+      }
       if (role === 'PA_TO_CI') {
         window.location.href = '/pa-ci'
       } else if (role === 'PA_TO_DIRECTOR') {

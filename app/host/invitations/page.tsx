@@ -70,6 +70,10 @@ export default function HostInvitationsPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       setUserRole(user.role)
 
       if (user.role === 'Host Employee') {

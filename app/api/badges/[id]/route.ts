@@ -77,7 +77,7 @@ export async function POST(
     if (action === 'print') {
       const { data: badge } = await supabaseAdmin
         .from('visitor_badges')
-        .select('reprint_count')
+        .select('id, reprint_count')
         .eq('id', id)
         .single()
 
@@ -89,8 +89,7 @@ export async function POST(
         .from('visitor_badges')
         .update({
           printed_at: new Date().toISOString(),
-          printed_by: null,
-          reprint_count: (badge as { reprint_count: number }).reprint_count + 1,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
 
@@ -104,7 +103,7 @@ export async function POST(
     if (action === 'reprint') {
       const { data: badge } = await supabaseAdmin
         .from('visitor_badges')
-        .select('reprint_count')
+        .select('id, reprint_count')
         .eq('id', id)
         .single()
 
@@ -112,17 +111,29 @@ export async function POST(
         return NextResponse.json({ success: false, message: '', error: '' }, { status: 404 })
       }
 
-      const { error } = await supabaseAdmin
+      const currentCount = (badge as { reprint_count: number }).reprint_count ?? 0
+
+      if (currentCount >= 5) {
+        return NextResponse.json({ success: false, message: 'Reprint limit reached', error: 'Reprint limit reached' }, { status: 400 })
+      }
+
+      const { error, count } = await supabaseAdmin
         .from('visitor_badges')
         .update({
           printed_at: new Date().toISOString(),
-          printed_by: null,
-          reprint_count: (badge as { reprint_count: number }).reprint_count + 1,
+          reprint_count: currentCount + 1,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
+        .eq('reprint_count', currentCount)
+        .lt('reprint_count', 5)
 
       if (error) {
         return NextResponse.json({ success: false, message: error.message, error: error.message }, { status: 400 })
+      }
+
+      if ((count ?? 0) === 0) {
+        return NextResponse.json({ success: false, message: 'Reprint limit reached or badge was modified by another request', error: 'Reprint limit reached or concurrent modification' }, { status: 400 })
       }
 
       return NextResponse.json({ success: true, message: 'Badge reprinted' })

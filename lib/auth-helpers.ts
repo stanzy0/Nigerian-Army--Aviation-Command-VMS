@@ -34,7 +34,7 @@ export async function requireAdmin() {
     return { authorized: false, error: 'Access denied', status: 403 as const }
   }
 
-  return { authorized: true, userEmail: user.email }
+  return { authorized: true, userEmail: user.email, userId: user.id }
 }
 
 export async function requireRole(allowedRoles: string[]) {
@@ -62,5 +62,5 @@ export async function requireRole(allowedRoles: string[]) {
     return { authorized: false, error: 'Access denied', status: 403 as const }
   }
 
-  return { authorized: true, userEmail: user.email }
+  return { authorized: true, userEmail: user.email, userId: user.id }
 }

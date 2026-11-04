@@ -224,6 +224,8 @@ export default function UsersPage() {
   }
 
   function handleEdit(user: UserWithHostAssignment) {
+    const role = user.role
+    if (!role) return
     setEditingUser(user)
     fetchCiEmployees()
     fetchDirectors()
@@ -232,27 +234,27 @@ export default function UsersPage() {
       try {
         const assignedEmployeeId = user.host_assignment?.employee_id || ''
 
-        if (user.role === 'PA_TO_CI') {
+        if (role === 'PA_TO_CI') {
           setFormData({
             email: user.email,
             full_name: user.full_name || '',
-            role: user.role,
+            role,
             assigned_host_id: assignedEmployeeId,
             assigned_director_id: '',
           })
-        } else if (user.role === 'PA_TO_DIRECTOR') {
+        } else if (role === 'PA_TO_DIRECTOR') {
           setFormData({
             email: user.email,
             full_name: user.full_name || '',
-            role: user.role,
+            role,
             assigned_host_id: '',
             assigned_director_id: assignedEmployeeId,
           })
         } else {
-          setFormData({ email: user.email, full_name: user.full_name || '', role: user.role, assigned_host_id: '', assigned_director_id: '' })
+          setFormData({ email: user.email, full_name: user.full_name || '', role, assigned_host_id: '', assigned_director_id: '' })
         }
       } catch {
-        setFormData({ email: user.email, full_name: user.full_name || '', role: user.role, assigned_host_id: '', assigned_director_id: '' })
+        setFormData({ email: user.email, full_name: user.full_name || '', role, assigned_host_id: '', assigned_director_id: '' })
       }
     }
 
@@ -322,7 +324,11 @@ export default function UsersPage() {
   useEffect(() => {
     const checkAuth = async () => {
       const user = await getCurrentUser()
-      if (!user || user.role !== 'Admin') {
+      if (!user || !user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
+      if (user.role !== 'Admin') {
         window.location.href = '/unauthorized'
         return
       }

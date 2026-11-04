@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   }
   try {
     const user = await getCurrentUser()
-    if (!user || !PERMISSIONS[user.role]?.includes('employees')) {
+    if (!user || !user.role || !PERMISSIONS[user.role]?.includes('employees')) {
       return NextResponse.json({ success: false, message: 'Authentication required', error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
-    if (!user || !PERMISSIONS[user.role]?.includes('employees')) {
+    if (!user || !user.role || !PERMISSIONS[user.role]?.includes('employees')) {
       return NextResponse.json({ success: false, message: 'Authentication required', error: 'Unauthorized' }, { status: 401 })
     }
 

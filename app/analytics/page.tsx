@@ -216,6 +216,10 @@ export default function AnalyticsPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       if (!PERMISSIONS[user.role]?.includes('analytics')) {
         window.location.href = '/unauthorized'
         return

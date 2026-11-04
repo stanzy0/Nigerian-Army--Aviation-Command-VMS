@@ -68,8 +68,9 @@ const QUICK_ACTIONS = [
   { label: 'Register Visitor', description: 'Add a new visitor to the system', icon: UserPlus, href: '/visitors/new', color: 'gold' as const, roles: ['Admin', 'Receptionist'] },
   { label: 'Check In', description: 'Process visitor arrival and entry', icon: UserCheck, href: '/visits?status=checked_in', color: 'olive-light' as const, roles: ['Admin', 'Receptionist', 'Security', 'PA_TO_DIRECTOR', 'PA_TO_CI'] },
   { label: 'Check Out', description: 'Process visitor departure', icon: LogOut, href: '/visits?status=checked_out', color: 'gray' as const, roles: ['Admin', 'Receptionist', 'Security', 'PA_TO_DIRECTOR', 'PA_TO_CI'] },
+  { label: 'Director Visitors', description: 'View visitors for your assigned Director', icon: Users, href: '/visits', color: 'army' as const, roles: ['PA_TO_DIRECTOR'] },
   { label: 'Print Badge', description: 'Generate and print visitor badge', icon: Printer, href: '/badges', color: 'army' as const, roles: ['Admin', 'Receptionist', 'Security'] },
-  { label: 'Search Visitor', description: 'Search visitor records', icon: Search, href: '/visitors', color: 'olive' as const, roles: ['Admin', 'Receptionist', 'Security', 'PA_TO_DIRECTOR', 'PA_TO_CI'] },
+  { label: 'Search Visitor', description: 'Search visitor records', icon: Search, href: '/visitors', color: 'olive' as const, roles: ['Admin', 'Receptionist', 'Security', 'PA_TO_CI'] },
 ]
 
 export default function DashboardPage() {
@@ -84,8 +85,9 @@ export default function DashboardPage() {
    const [chartColors, setChartColors] = useState<string[]>(COLORS)
   const { branding } = useBranding()
   const { notifications, unreadCount } = useNotifications()
-  const [filters, setFilters] = useState<DashboardFilters>({ range: 'today' })
+   const [filters, setFilters] = useState<DashboardFilters>({ range: 'today' })
   const [exporting, setExporting] = useState(false)
+  const [paDirectorEmployeeId, setPaDirectorEmployeeId] = useState<string | null>(null)
   const [securityStats, setSecurityStats] = useState({
     visitorsWaitingAtGate: 0,
     visitorsCleared: 0,
@@ -97,7 +99,7 @@ export default function DashboardPage() {
     watchlistMatches: 0,
   })
   const [pendingOnlineRegistrations, setPendingOnlineRegistrations] = useState<Array<{ id: string; full_name: string; registration_number: string; created_at: string; purpose: string; employee: { full_name: string; department: string } | null }>>([])
-  const [recentVisitors, setRecentVisitors] = useState<Array<{ id: string; full_name: string; photo_url?: string | null; status: string; created_at: string; purpose?: string; host_name?: string; host_department?: string }>>([])
+   const [recentVisitors, setRecentVisitors] = useState<Array<{ id: string; full_name: string; photo_url?: string | null; status: string; created_at: string; purpose?: string; host_name?: string; host_department?: string; host_employee_id?: string | null }>>([])
   const [pendingDocuments, setPendingDocuments] = useState<Array<{ id: string; visitor_name: string; organization: string; document_type: string; document_number: string; created_at: string; photo_url: string | null }>>([])
 
   const { stats, activity, securityAlerts, visitorsByDay, visitorsByMonth, visitorsByDepartment, visitorsByHost, visitorsByCompany, visitorsByPurpose, badgeStatusDistribution, employeesByDepartment, loading, error, refetch } = useDashboardData(filters, authReady)
@@ -253,6 +255,7 @@ export default function DashboardPage() {
         purpose: visit.purpose || 'Demo visit',
         host_name: visit.employee?.full_name || 'Demo Host',
         host_department: visit.employee?.department || '—',
+        host_employee_id: visit.employee?.id || null,
         status: visit.status,
         created_at: visit.created_at,
       }))
@@ -266,13 +269,13 @@ export default function DashboardPage() {
       }
       const result = await response.json()
       if (result.success && result.data.recentVisitors) {
-        const mapped = (result.data.recentVisitors as Array<{
+        let mapped = (result.data.recentVisitors as Array<{
           id: string
           status: string
           created_at: string
           purpose?: string
           visitor?: { full_name?: string; photo_url?: string | null }
-          employee?: { full_name?: string; department?: string }
+          employee?: { full_name?: string; department?: string; id?: string }
         }>).map((visit) => ({
           id: visit.id,
           full_name: visit.visitor?.full_name || 'Unknown',
@@ -282,19 +285,45 @@ export default function DashboardPage() {
           purpose: visit.purpose,
           host_name: visit.employee?.full_name || '—',
           host_department: visit.employee?.department || '—',
+          host_employee_id: visit.employee?.id || null,
         }))
+
+        if (userRole === 'PA_TO_DIRECTOR' && paDirectorEmployeeId) {
+          mapped = mapped.filter(v => v.host_employee_id === paDirectorEmployeeId)
+        }
+
         setRecentVisitors(mapped)
       }
     } catch (err) {
       console.error('Failed to fetch recent visitors:', err)
     }
-  }, [authReady])
+  }, [authReady, userRole, paDirectorEmployeeId])
 
   useEffect(() => {
     if (authReady) {
       fetchRecentVisitors()
     }
   }, [authReady, fetchRecentVisitors])
+
+  useEffect(() => {
+    if (!authReady || userRole !== 'PA_TO_DIRECTOR') return
+    if (isDemoMode()) return
+    const fetchPaAssignment = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_host_assignments')
+          .select('employee_id')
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+          .single()
+        if (!error && data) {
+          setPaDirectorEmployeeId(data.employee_id)
+        }
+      } catch (err) {
+        console.error('Failed to fetch PA assignment:', err)
+      }
+    }
+    fetchPaAssignment()
+  }, [authReady, userRole, supabase])
 
   useEffect(() => {
     if (!authReady) return
@@ -355,7 +384,15 @@ export default function DashboardPage() {
       try {
         const user = await getCurrentUser()
         if (!user) { window.location.href = '/login'; return }
-        setUserRole(user.role)
+        if (user.missingRole) {
+          setAuthChecking(false)
+          setAuthReady(true)
+          setUserRole(user.role as UserRole)
+          setUserEmail(user.email || '')
+          setUserName(user.full_name || '')
+          return
+        }
+        setUserRole(user.role as UserRole)
         setUserEmail(user.email)
         setUserName(user.full_name || '')
         setAuthChecking(false)
@@ -632,19 +669,21 @@ export default function DashboardPage() {
               ))}
             </motion.div>
 
-            {!isPA && (
+            {(userRole === 'Admin' || userRole === 'Receptionist' || userRole === 'Security' || userRole === 'PA_TO_DIRECTOR') && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <RecentVisitorsTable
                   visitors={recentVisitors}
                   onViewProfile={handleViewProfile}
                   onPrintBadge={handlePrintBadge}
                 />
-                <PendingApprovalsTable
-                  approvals={pendingOnlineRegistrations}
-                  onApprove={handleApproveRegistration}
-                  onReject={handleRejectRegistration}
-                  onViewProfile={handleViewProfile}
-                />
+                {(userRole === 'Admin' || userRole === 'Receptionist' || userRole === 'Security') && (
+                  <PendingApprovalsTable
+                    approvals={pendingOnlineRegistrations}
+                    onApprove={handleApproveRegistration}
+                    onReject={handleRejectRegistration}
+                    onViewProfile={handleViewProfile}
+                  />
+                )}
               </div>
             )}
 

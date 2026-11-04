@@ -74,6 +74,10 @@ export default function InvitationsPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       if (!PERMISSIONS[user.role]?.includes('host')) {
         window.location.href = '/unauthorized'
         return

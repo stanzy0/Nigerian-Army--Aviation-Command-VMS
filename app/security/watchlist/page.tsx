@@ -48,6 +48,10 @@ export default function WatchlistPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       if (!PERMISSIONS[user.role]?.includes('watchlist')) {
         window.location.href = '/unauthorized'
         return

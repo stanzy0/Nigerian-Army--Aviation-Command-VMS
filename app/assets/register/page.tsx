@@ -47,6 +47,10 @@ export default function RegisterPropertyPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       setUserRole(user.role)
       fetchVisits()
     }

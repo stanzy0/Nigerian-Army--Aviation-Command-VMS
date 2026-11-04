@@ -194,6 +194,10 @@ export default function OperationsPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       if (!PERMISSIONS[user.role]?.includes('operations')) {
         window.location.href = '/unauthorized'
         return

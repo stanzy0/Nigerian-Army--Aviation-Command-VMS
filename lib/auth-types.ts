@@ -4,9 +4,10 @@ export interface UserWithRole {
   id: string
   email: string
   full_name: string | null
-  role: UserRole
+  role: UserRole | null
   created_at: string | null
   must_change_password?: boolean
+  missingRole?: boolean
 }
 
 export const PERMISSIONS: Record<UserRole, string[]> = {
@@ -96,7 +97,6 @@ export const PERMISSIONS: Record<UserRole, string[]> = {
   ],
   PA_TO_DIRECTOR: [
     'dashboard',
-    'visitors',
     'visits',
     'badges',
     'check-in',

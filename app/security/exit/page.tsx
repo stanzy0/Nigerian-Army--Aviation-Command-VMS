@@ -137,6 +137,10 @@ export default function ExitControlPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       const allowed = ['Security', 'Admin', 'Receptionist']
       if (!allowed.includes(user.role)) {
         window.location.href = '/unauthorized'
@@ -411,6 +415,7 @@ export default function ExitControlPage() {
       if (selectedVisit.badge?.id) {
         await supabase.from('visitor_badges').update({
           badge_status: badgeReturnStatus === 'returned' ? 'Checked Out' : badgeReturnStatus === 'lost' ? 'Lost' : 'Damaged',
+          updated_at: new Date().toISOString(),
         }).eq('id', selectedVisit.badge.id)
       }
 

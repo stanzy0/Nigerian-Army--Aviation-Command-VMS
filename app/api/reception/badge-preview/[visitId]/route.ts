@@ -13,7 +13,7 @@ import { getDocumentVerifications } from '@/lib/server/document-verification'
 import { applyVisitStatusChange, type VisitStatus } from '@/lib/server/visit-status'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ visitId: string }> }) {
-  const authResult = await requireRole(['Admin', 'Receptionist'])
+  const authResult = await requireRole(['Admin', 'Receptionist', 'PA_TO_DIRECTOR', 'PA_TO_CI'])
   if (!authResult.authorized) {
     return NextResponse.json({ success: false, message: authResult.error, error: authResult.error }, { status: authResult.status })
   }
@@ -28,6 +28,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!visit) {
       return NextResponse.json({ success: false, message: '', error: '' }, { status: 404 })
+    }
+
+    // PA roles can only preview badges for their assigned visitors
+    const currentUser = await getCurrentUser()
+    const userRole = currentUser?.role ?? null
+
+    if (userRole === 'PA_TO_DIRECTOR' || userRole === 'PA_TO_CI') {
+      const { data: assignment } = await supabaseAdmin
+        .from('user_host_assignments')
+        .select('employee_id')
+        .eq('user_id', authResult.userId)
+        .single()
+
+      if (!assignment || assignment.employee_id !== visit.employee?.id) {
+        return NextResponse.json({ success: false, message: 'You are not authorized to view this badge', error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     const templates = await getBadgeTemplates()

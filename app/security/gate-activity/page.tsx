@@ -16,6 +16,10 @@ export default function GateActivityPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       if (!PERMISSIONS[user.role]?.includes('scanner')) {
         window.location.href = '/unauthorized'
         return

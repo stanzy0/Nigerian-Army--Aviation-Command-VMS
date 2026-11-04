@@ -60,13 +60,13 @@ export async function getCurrentUserRole(): Promise<UserRole> {
 
 export async function hasPermission(permission: string): Promise<boolean> {
   const user = await getCurrentUser()
-  if (!user) return false
+  if (!user || !user.role) return false
   return PERMISSIONS[user.role]?.includes(permission) || false
 }
 
 export async function requireRole(allowedRoles: UserRole[]): Promise<boolean> {
   const user = await getCurrentUser()
-  if (!user) return false
+  if (!user || !user.role) return false
   return allowedRoles.includes(user.role)
 }
 

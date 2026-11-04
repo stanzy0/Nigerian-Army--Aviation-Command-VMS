@@ -1,4 +1,4 @@
-export type BadgeStatus = 'Active' | 'Expired' | 'Checked Out' | 'Cancelled' | 'Revoked'
+export type BadgeStatus = 'Pending' | 'Active' | 'Returned' | 'Expired' | 'Cancelled' | 'Lost' | 'Checked Out' | 'Damaged' | 'Revoked'
 
 export interface BadgeVisit {
   id: string

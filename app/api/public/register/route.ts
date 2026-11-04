@@ -31,13 +31,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: 'Visitor registration is handled at the Main Reception Desk.', error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data: userRole } = await supabase
+  const { data: userRole, error: roleError } = await supabaseAdmin
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (!userRole || !['Admin', 'Receptionist'].includes(userRole.role)) {
+  if (roleError || !userRole || !['Admin', 'Receptionist'].includes(userRole.role)) {
     return NextResponse.json({ success: false, message: 'Visitor registration is handled at the Main Reception Desk.', error: 'Forbidden' }, { status: 403 })
   }
 
@@ -152,7 +152,6 @@ export async function POST(request: NextRequest) {
         emergency_contact: emergency_phone || null,
         vehicle_plate: has_vehicle ? registration_number : null,
         vehicle_type: has_vehicle ? vehicle_type : null,
-        visitor_type: visitor_type || 'Visitor',
       })
       .select()
       .single()
@@ -165,6 +164,8 @@ export async function POST(request: NextRequest) {
     visitorId = visitor.id
     log(regNumber, 'Visitor created', { visitorId })
 
+    const visitDate = visit_date ? new Date(visit_date).toISOString() : new Date().toISOString()
+
     const { data: visit, error: visitError } = await supabaseAdmin
       .from('visits')
       .insert({
@@ -172,11 +173,8 @@ export async function POST(request: NextRequest) {
         employee_id: employee.id,
         purpose,
         status: 'pending',
-        source: 'public',
-        registration_number: regNumber,
-        visitor_type: visitor_type || 'Visitor',
+        scheduled_date: visitDate,
         notes: notes || null,
-        is_pre_arranged: is_pre_arranged ?? false,
       })
       .select()
       .single()
@@ -202,18 +200,17 @@ export async function POST(request: NextRequest) {
         )
       }
 
-const { error: docError } = await supabaseAdmin.from('visitor_documents').insert({
-      visitor_id: visitor.id,
-      document_type: doc_type || 'National ID',
-      document_number: doc_number,
-      issuing_country: issuing_country || null,
-      expiry_date: expiry_date || null,
-      front_image_url: doc_front_url,
-      file_url: doc_front_url,
-      back_image_url: doc_back_url || null,
-      verified: false,
-      verification_status: 'Pending',
-    })
+      const { error: docError } = await supabaseAdmin.from('visitor_documents').insert({
+        visitor_id: visitor.id,
+        document_type: doc_type || 'National ID',
+        document_number: doc_number,
+        issuing_country: issuing_country || null,
+        expiry_date: expiry_date || null,
+        front_image_url: doc_front_url,
+        file_url: doc_front_url,
+        back_image_url: doc_back_url || null,
+        verified: false,
+      })
 
       if (docError) {
         log(regNumber, 'FAILED: Could not save document', { error: docError.message })
@@ -229,27 +226,13 @@ const { error: docError } = await supabaseAdmin.from('visitor_documents').insert
     const qrToken = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('')
     const expiresAt = new Date()
     expiresAt.setHours(expiresAt.getHours() + 24)
-    
+
     console.log("STEP 1");
 
-    try {
-      const badgeNumberRes = await supabaseAdmin.rpc("generate_visitor_badge_number");
-
-      console.log("STEP 2");
-      console.log(badgeNumberRes);
-
-      if (badgeNumberRes.error) {
-        console.error("RPC ERROR:", badgeNumberRes.error);
-        throw badgeNumberRes.error;
-      }
-
-      badgeNumber = badgeNumberRes.data;
-
-      console.log("STEP 3");
-    } catch (e) {
-      console.error("RPC THREW:", e);
-      throw e;
-    }
+    // Generate badge number manually (RPC function may not exist in schema cache)
+    const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '')
+    const randomSuffix = Math.floor(Math.random() * 9000 + 1000).toString()
+    const badgeNumber = `BADGE-${dateStr}-${randomSuffix}`
 
     console.log("STEP 4");
     const { data: badge, error: badgeError } = await supabaseAdmin

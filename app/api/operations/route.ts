@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
     }
 
     const allowedRoles = ['Admin', 'Commandant', 'Director', 'Security']
-    if (!allowedRoles.includes(user.role)) {
+    const userRole = user.role
+    if (!userRole || !allowedRoles.includes(userRole)) {
       return NextResponse.json({ success: false, message: 'Insufficient permissions', error: 'Forbidden' }, { status: 403 })
     }
 
@@ -78,7 +79,8 @@ export async function POST(request: NextRequest) {
     }
 
     const allowedRoles = ['Admin', 'Commandant', 'Director']
-    if (!allowedRoles.includes(user.role)) {
+    const userRole = user.role
+    if (!userRole || !allowedRoles.includes(userRole)) {
       return NextResponse.json({ success: false, message: 'Insufficient permissions', error: 'Forbidden' }, { status: 403 })
     }
 

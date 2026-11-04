@@ -36,6 +36,10 @@ export default function AssetsPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       setUserRole(user.role)
       fetchItems()
     }

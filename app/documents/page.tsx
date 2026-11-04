@@ -64,6 +64,10 @@ export default function DocumentsPage() {
       window.location.href = '/login'
       return
     }
+    if (!user.role) {
+      window.location.href = '/unauthorized'
+      return
+    }
     setUserRole(user.role)
     setAuthChecking(false)
   }

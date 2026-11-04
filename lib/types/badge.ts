@@ -3,7 +3,7 @@ export interface VisitorBadge {
   visit_id: string
   badge_number: string
   qr_token: string
-  badge_status: 'Active' | 'Expired' | 'Checked Out' | 'Cancelled'
+  badge_status: 'Pending' | 'Active' | 'Returned' | 'Expired' | 'Cancelled' | 'Lost' | 'Checked Out' | 'Damaged' | 'Revoked'
   issued_at: string
   expires_at: string
   printed_at: string | null

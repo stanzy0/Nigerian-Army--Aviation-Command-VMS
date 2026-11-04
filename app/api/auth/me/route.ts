@@ -52,10 +52,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (!userRole) {
-      return NextResponse.json(
-        { success: false, error: 'User role not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: user.id,
+          email: user.email || '',
+          full_name: null,
+          role: null,
+          created_at: null,
+          missingRole: true,
+        },
+      })
     }
 
     return NextResponse.json({

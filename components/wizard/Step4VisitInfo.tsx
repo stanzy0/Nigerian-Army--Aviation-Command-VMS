@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { getCurrentUser, type UserRole } from '@/lib/auth-client'
 import type { VisitorFormData } from '@/lib/types/visitor'
 import SearchableCombobox from '@/components/ui/SearchableCombobox'
@@ -57,20 +56,25 @@ export default function Step4VisitInfo({ host_employee_id = '', purpose = '', cu
   const [userRole, setUserRole] = useState<UserRole | null>(null)
 
   useEffect(() => {
-    supabase
-      .from('employees')
-      .select('id, full_name, department, position, office_location, phone, email')
-      .order('full_name')
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('Failed to load employees:', error)
-          setEmployees([])
+    const fetchEmployees = async () => {
+      try {
+        const res = await fetch('/api/employees', { credentials: 'include', cache: 'no-store' })
+        if (res.ok) {
+          const result = await res.json()
+          setEmployees(result.data ?? [])
         } else {
-          setEmployees(data ?? [])
+          console.error('Failed to load employees:', await res.text())
+          setEmployees([])
         }
+      } catch (err) {
+        console.error('Failed to load employees:', err)
+        setEmployees([])
+      } finally {
         setLoadingEmployees(false)
-      })
-    }, [])
+      }
+    }
+    fetchEmployees()
+  }, [])
 
     const fetchUserRole = async () => {
       const user = await getCurrentUser()

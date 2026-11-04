@@ -69,6 +69,10 @@ export default function VisitorsPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       if (!PERMISSIONS[user.role]?.includes('visitors')) {
         window.location.href = '/unauthorized'
         return

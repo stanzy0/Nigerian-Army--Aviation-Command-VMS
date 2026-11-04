@@ -25,10 +25,6 @@ export async function getCurrentUser(): Promise<UserWithRole | null> {
     })
 
     if (!res.ok) {
-      if (res.status === 401 || res.status === 404) {
-        return null
-      }
-      console.error('[getCurrentUser] API error:', await res.text())
       return null
     }
 
@@ -42,6 +38,7 @@ export async function getCurrentUser(): Promise<UserWithRole | null> {
       role: data.role as UserRole,
       created_at: data.created_at,
       must_change_password: data.must_change_password ?? false,
+      missingRole: data.missingRole ?? false,
     }
   } catch (err) {
     console.error('[getCurrentUser] Network error:', err)
@@ -49,20 +46,54 @@ export async function getCurrentUser(): Promise<UserWithRole | null> {
   }
 }
 
-export async function getCurrentUserRole(): Promise<UserRole> {
-  const user = await getCurrentUser()
-  return user?.role || 'Receptionist'
+export async function getCurrentUserRoleStatus(): Promise<{
+  authenticated: boolean
+  role: UserRole | null
+  missingRole: boolean
+}> {
+  if (isDemoMode()) {
+    return { authenticated: true, role: 'Admin' as UserRole, missingRole: false }
+  }
+
+  try {
+    const res = await fetch('/api/auth/me', {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+
+    if (res.status === 401) {
+      return { authenticated: false, role: null, missingRole: false }
+    }
+
+    if (!res.ok) {
+      return { authenticated: false, role: null, missingRole: false }
+    }
+
+    const { data } = await res.json()
+    if (!data) {
+      return { authenticated: false, role: null, missingRole: false }
+    }
+
+    return {
+      authenticated: true,
+      role: (data.role as UserRole) ?? null,
+      missingRole: data.missingRole ?? false,
+    }
+  } catch (err) {
+    console.error('[getCurrentUserRoleStatus] Network error:', err)
+    return { authenticated: false, role: null, missingRole: false }
+  }
 }
 
 export async function hasPermission(permission: string): Promise<boolean> {
   const user = await getCurrentUser()
-  if (!user) return false
+  if (!user || !user.role) return false
   return PERMISSIONS[user.role]?.includes(permission) || false
 }
 
 export async function requireRole(allowedRoles: UserRole[]): Promise<boolean> {
   const user = await getCurrentUser()
-  if (!user) return false
+  if (!user || !user.role) return false
   return allowedRoles.includes(user.role)
 }
 

@@ -300,6 +300,10 @@ export default function VehiclesPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       if (!PERMISSIONS[user.role]?.includes('vehicles')) {
         window.location.href = '/unauthorized'
         return

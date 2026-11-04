@@ -115,6 +115,10 @@ export default function BadgesPage() {
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       if (!PERMISSIONS[user.role]?.includes('badges')) {
         window.location.href = '/unauthorized'
         return

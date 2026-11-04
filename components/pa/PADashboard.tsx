@@ -364,6 +364,10 @@ export default function PADashboard({ paRole, title, hostTitle }: PADashboardPro
         window.location.href = '/login'
         return
       }
+      if (!user.role) {
+        window.location.href = '/unauthorized'
+        return
+      }
       const allowed: UserRole[] = [paRole, 'Admin']
       if (!allowed.includes(user.role)) {
         window.location.href = '/unauthorized'
