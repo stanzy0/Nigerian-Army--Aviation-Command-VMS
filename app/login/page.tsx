@@ -183,7 +183,7 @@ export default function LoginPage() {
   const primaryColor = branding?.primary_color || '#4B5320'
   const secondaryColor = branding?.secondary_color || '#556B2F'
   const accentColor = branding?.accent_color || '#C8A646'
-  const loginBg = branding?.login_background_url || '/images/afcsc-login.jpg'
+  const loginBg = branding?.login_background_url || '/images/naac-login.jpg'
   const collegeName = branding?.college_name || 'Nigerian Army Aviation Command'
 
   return (

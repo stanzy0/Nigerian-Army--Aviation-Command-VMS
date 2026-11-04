@@ -11,6 +11,8 @@ export default function RegisterPage() {
   const [checking, setChecking] = useState(true)
   const [user, setUser] = useState<Awaited<ReturnType<typeof getCurrentUser>> | null>(null)
 
+  const collegeName = 'Nigerian Army Aviation Command'
+
   useEffect(() => {
     getCurrentUser().then(u => {
       setUser(u)
@@ -20,16 +22,30 @@ export default function RegisterPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen bg-[#0B0F08] flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="relative min-h-screen bg-[#0B0F08] flex items-center justify-center">
+        <Image
+          src="/images/naac-login.jpg"
+          alt={collegeName}
+          className="absolute inset-0 object-cover"
+          priority
+        />
+        <div className="absolute inset-0 z-10" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600 z-20" />
       </div>
     )
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen bg-[#0B0F08]">
-        <header className="bg-[#10150D] border-b border-[rgba(85,107,47,0.35)]">
+  return (
+    <div className="relative min-h-screen bg-[#0B0F08]">
+      <Image
+        src="/images/naac-logo.jpg"
+        alt={collegeName}
+        className="absolute inset-0 object-cover"
+        priority
+      />
+      <div className="absolute inset-0 z-10 bg-[#0B0F08]/70" />
+      <header className="relative z-20 bg-[#10150D] border-b border-[rgba(85,107,47,0.35)]">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -78,8 +94,15 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B0F08]">
-      <header className="bg-[#10150D] border-b border-[rgba(85,107,47,0.35)]">
+    <div className="relative min-h-screen bg-[#0B0F08]">
+      <Image
+        src="/images/naac-login.jpg"
+        alt={collegeName}
+        className="absolute inset-0 object-cover"
+        priority
+      />
+      <div className="absolute inset-0 z-10" />
+      <header className="relative z-20 bg-[#10150D] border-b border-[rgba(85,107,47,0.35)]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

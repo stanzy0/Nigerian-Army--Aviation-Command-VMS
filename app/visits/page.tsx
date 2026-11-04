@@ -246,7 +246,7 @@ const statusStyles: Record<string, string> = {
     <div className="min-h-screen bg-[#0B0F08] relative">
       <div className="absolute inset-0 z-0">
         <img
-          src="/images/afcsc-login.jpg"
+          src="/images/naac-login.jpg"
           alt="Nigerian Army Aviation Command background"
           className="w-full h-full object-cover"
         />

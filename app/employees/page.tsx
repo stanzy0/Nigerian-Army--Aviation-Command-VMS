@@ -234,7 +234,7 @@ export default function EmployeesPage() {
       <div className="flex h-screen bg-[#0B0F08] relative items-center justify-center">
         <div className="absolute inset-0 z-0">
           <img
-            src="/images/afcsc-login.jpg"
+            src="/images/naac-login.jpg"
             alt="Nigerian Army Aviation Command background"
             className="w-full h-full object-cover"
           />
@@ -249,7 +249,7 @@ export default function EmployeesPage() {
     <div className="min-h-screen bg-[#0B0F08] relative">
       <div className="absolute inset-0 z-0">
         <img
-          src="/images/afcsc-login.jpg"
+          src="/images/naac-login.jpg"
           alt="Nigerian Army Aviation Command background"
           className="w-full h-full object-cover"
         />

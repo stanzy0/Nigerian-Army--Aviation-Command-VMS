@@ -48,7 +48,7 @@ const GALLERY = [
   { src: '/images/home/gate.jpg', alt: 'Main gate', caption: 'Main Entrance' },
   { src: '/images/home/command.jpg', alt: 'Command building', caption: 'Command Wing' },
   { src: '/images/home/campus.jpg', alt: 'Campus overview', caption: 'Campus Grounds' },
-  { src: '/images/home/auditorium.jpg', alt: 'Auditorium', caption: 'Auditorium Complex' },
+  { src: '/images/home/auditorium.jpg', alt: 'Waiting Room', caption: 'Waiting Room' },
 ]
 
 export default function PublicLandingPage() {

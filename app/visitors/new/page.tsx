@@ -70,11 +70,11 @@ export default function NewVisitorPage() {
     <div className="min-h-screen bg-[#0B0F08] relative">
       {/* Full-screen background image */}
       <div className="absolute inset-0 z-0">
-        <img
-          src="/images/afcsc-login.jpg"
-          alt="NA Avn Comd login background"
-          className="w-full h-full object-cover"
-        />
+          <img
+            src="/images/naac-login.jpg"
+            alt="NA Avn Comd login background"
+            className="w-full h-full object-cover"
+          />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F08]/90 via-[#0B0F08]/70 to-[#0B0F08]/40" />
       </div>
 
