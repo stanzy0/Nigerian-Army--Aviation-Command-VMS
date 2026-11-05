@@ -21,14 +21,14 @@ interface PendingApprovalsProps {
 }
 
 const typeConfig: Record<string, { color: string; bg: string }> = {
-  'Visit': { color: 'bg-[#4B5320]', bg: 'bg-[#4B5320]/10' },
-  'Meeting': { color: 'bg-[#C8A646]', bg: 'bg-[#C8A646]/10' },
-  'Tour': { color: 'bg-[#6B8E23]', bg: 'bg-[#6B8E23]/10' },
-  'Interview': { color: 'bg-[#556B2F]', bg: 'bg-[#556B2F]/10' },
-  'Delivery': { color: 'bg-[#B89635]', bg: 'bg-[#B89635]/10' },
-  'Training': { color: 'bg-[#4B5320]', bg: 'bg-[#4B5320]/10' },
-  'Conference': { color: 'bg-[#3D5A1E]', bg: 'bg-[#3D5A1E]/10' },
-  'default': { color: 'bg-[#6B705A]', bg: 'bg-[#6B705A]/10' },
+  'Visit': { color: 'text-[#4B5320]', bg: 'bg-[#4B5320]/10' },
+  'Meeting': { color: 'text-[#C8A646]', bg: 'bg-[#C8A646]/10' },
+  'Tour': { color: 'text-[#6B8E23]', bg: 'bg-[#6B8E23]/10' },
+  'Interview': { color: 'text-[#556B2F]', bg: 'bg-[#556B2F]/10' },
+  'Delivery': { color: 'text-[#B89635]', bg: 'bg-[#B89635]/10' },
+  'Training': { color: 'text-[#4B5320]', bg: 'bg-[#4B5320]/10' },
+  'Conference': { color: 'text-[#3D5A1E]', bg: 'bg-[#3D5A1E]/10' },
+  'default': { color: 'text-[#6B705A]', bg: 'bg-[#6B705A]/10' },
 }
 
 export default function PendingApprovalsTable({

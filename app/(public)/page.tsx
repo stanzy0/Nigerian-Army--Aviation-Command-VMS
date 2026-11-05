@@ -114,7 +114,7 @@ export default function PublicLandingPage() {
                 </h1>
 
                 <p className="mt-3 text-xs sm:text-sm font-semibold uppercase tracking-widest text-[#9A9F87]">
-                  Nigerian Army Aviation Visitors Management System
+Nigerian Army Aviation Command
                 </p>
 
                 <p className="mt-4 text-lg sm:text-xl font-semibold text-[#C8A646] tracking-wide">
@@ -198,7 +198,7 @@ export default function PublicLandingPage() {
             <div className="max-w-3xl mx-auto text-center">
               <h2 className="text-xl sm:text-2xl font-bold text-[#F5F5DC] tracking-tight">About the Visitor Management System</h2>
               <p className="mt-4 text-sm sm:text-base text-[#9A9F87] leading-relaxed">
-                The Visitor Management System (VMS) is an integrated platform designed for the Nigerian Army Aviation Visitors Management System. It provides secure visitor registration, host verification, access control, and real-time monitoring to maintain institutional security and accountability.
+                The Visitor Management System (VMS) is an integrated platform designed for the Nigerian Army Aviation Command. It provides secure visitor registration, host verification, access control, and real-time monitoring to maintain institutional security and accountability.
               </p>
             </div>
           </div>
@@ -394,8 +394,8 @@ export default function PublicLandingPage() {
             </div>
 
             <div className="space-y-1">
-              <p className="text-sm font-bold text-[#F5F5DC] uppercase tracking-wider">Nigerian Army Aviation Visitors Management</p>
-              <p className="text-xs text-[#9A9F87]">Nigerian Army Aviation Visitors Management System</p>
+              <p className="text-sm font-bold text-[#F5F5DC] uppercase tracking-wider">Nigerian Army Aviation Command</p>
+              <p className="text-xs text-[#9A9F87]">Nigerian Army Aviation Command</p>
               <p className="text-xs text-[#9A9F87]">Nigerian Army Aviation Command</p>
             </div>
 
