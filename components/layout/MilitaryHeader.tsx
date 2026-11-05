@@ -68,7 +68,7 @@ export default function MilitaryHeader() {
           <Link
             href="/"
             className="flex items-center gap-3 sm:gap-4 min-w-0 transition-opacity duration-200 hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-[#C8A646]/60 focus:ring-offset-2 focus:ring-offset-[#10150D] rounded"
-            aria-label="Nigerian Army Aviation Command Visitor Management - Go to homepage"
+            aria-label="Nigerian Army Aviation Visitors Management System - Go to homepage"
             title="Go to homepage"
           >
             <ImageWithFallback
@@ -77,7 +77,7 @@ export default function MilitaryHeader() {
               className="h-8 w-8 sm:h-9 sm:w-9 object-contain flex-shrink-0"
             />
             <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-[#F5F5DC] whitespace-nowrap">
-              Nigerian Army Aviation Command Visitor Management
+              Nigerian Army Aviation Visitors Management System
             </span>
           </Link>
 

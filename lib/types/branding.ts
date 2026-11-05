@@ -33,7 +33,7 @@ export interface BrandingUpdatePayload {
 
 export const DEFAULT_BRANDING: BrandingSettings = {
   id: '00000000-0000-0000-0000-000000000000',
-  college_name: 'Nigerian Army Aviation Command Visitor Management System',
+  college_name: 'Nigerian Army Aviation Visitors Management System',
   logo_url: null,
   department_logo_url: null,
   login_background_url: null,

@@ -214,7 +214,7 @@ export default function LoginPage() {
               />
             </div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight">
-Nigerian Army Aviation Command Visitor Management
+Nigerian Army Aviation Visitors Management
             </h1>
             <p className="text-xs sm:text-sm text-white/80 mt-1 max-w-md">
               Secure Visitor Registration &amp; Access Management
@@ -246,7 +246,7 @@ Nigerian Army Aviation Command Visitor Management
               />
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-[#F5F5DC]">Sign in to continue</h2>
-            <p className="text-sm text-[#9A9F87] mt-1">Access the Nigerian Army Aviation Command Visitor Management System</p>
+            <p className="text-sm text-[#9A9F87] mt-1">Access the Nigerian Army Aviation Visitors Management System</p>
           </div>
 
           {error && (
