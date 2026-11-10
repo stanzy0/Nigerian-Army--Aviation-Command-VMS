@@ -147,16 +147,11 @@ export default function UsersPage() {
 
     try {
       if (editingUser) {
-        const res = await fetch('/api/users/create', {
-          method: 'POST',
+        const res = await fetch(`/api/users/${editingUser.user_id}`, {
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: editingUser.user_id,
-            email: formData.email,
-            full_name: formData.full_name,
             role: formData.role,
-            assigned_host_id: formData.role === 'PA_TO_CI' ? formData.assigned_host_id || undefined : undefined,
-            assigned_director_id: formData.role === 'PA_TO_DIRECTOR' ? formData.assigned_director_id || undefined : undefined,
           }),
         })
 
