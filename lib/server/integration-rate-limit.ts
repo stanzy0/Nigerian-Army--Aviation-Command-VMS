@@ -43,12 +43,11 @@ export async function checkRateLimit(
   const windowStart = new Date(
     Math.floor(now.getTime() / (windowSeconds * 1000)) * windowSeconds * 1000
   );
-  const windowStartSeconds = Math.floor(windowStart.getTime() / 1000);
 
   try {
     const { data, error } = await supabaseAdmin.rpc(
       'api_integration_rate_limit_increment',
-      { p_key_id: integrationKeyId, p_window_start: windowStartSeconds }
+      { p_key_id: integrationKeyId, p_window_start: windowStart.toISOString() }
     );
 
     if (error) {
