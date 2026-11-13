@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getCurrentUser } from '@/lib/auth-client'
-import { Loader2, Printer, Download, Eye, Shield } from 'lucide-react'
 import { getBadges, reprintBadge, cancelBadge } from '@/lib/client/badges'
 import { printBadgeWindow } from '@/lib/badge/badge-print'
+import { Loader2, Printer, Download, Eye, Shield } from 'lucide-react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import BadgeLayout from '@/components/BadgeLayout'
@@ -13,37 +13,96 @@ import type { VisitorBadge } from '@/lib/badge/badge-types'
 export default function AdminBadgesPage() {
   const [badges, setBadges] = useState<VisitorBadge[]>([])
   const [loading, setLoading] = useState(true)
+  const [authChecking, setAuthChecking] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedBadge, setSelectedBadge] = useState<VisitorBadge | null>(null)
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const requestIdRef = useRef(0)
 
-  const fetchBadges = async () => {
+  // Debounce search term (~400ms)
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 400)
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [searchTerm])
+
+  const showNotification = useCallback((type: 'success' | 'error', message: string) => {
+    setNotification({ type, message })
+    setTimeout(() => setNotification(null), 3000)
+  }, [])
+
+  const fetchBadges = useCallback(async () => {
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    const currentRequestId = ++requestIdRef.current
+
     setLoading(true)
     try {
-      const data = await getBadges()
+      const data = await getBadges(debouncedSearchTerm, statusFilter, controller.signal)
+      if (currentRequestId !== requestIdRef.current) return
       setBadges(data)
     } catch (err) {
-      setNotification({ type: 'error', message: err instanceof Error ? err.message : 'Failed to load badges' })
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      if (currentRequestId !== requestIdRef.current) return
+      showNotification('error', err instanceof Error ? err.message : 'Failed to load badges')
     } finally {
-      setLoading(false)
+      if (currentRequestId === requestIdRef.current) {
+        setLoading(false)
+      }
     }
-  }
+  }, [debouncedSearchTerm, statusFilter, showNotification])
 
+  // Check authentication once on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const user = await getCurrentUser()
-      if (!user) {
+      try {
+        const user = await getCurrentUser()
+        if (!user) {
+          window.location.href = '/login'
+          return
+        }
+        if (user.role !== 'Admin') {
+          window.location.href = '/unauthorized'
+          return
+        }
+        setAuthChecking(false)
+      } catch (err) {
+        console.error('[Auth check failed]', err)
         window.location.href = '/login'
         return
       }
-      if (user.role !== 'Admin') {
-        window.location.href = '/unauthorized'
-        return
-      }
-      fetchBadges()
     }
     checkAuth()
+  }, [])
+
+  // Fetch badges when debounced search term or status filter changes, but only after auth
+  useEffect(() => {
+    if (!authChecking) {
+      fetchBadges()
+    }
+  }, [fetchBadges, authChecking])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort()
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
   }, [])
 
   const handleReprint = async (badgeId: string) => {
@@ -51,10 +110,10 @@ export default function AdminBadgesPage() {
       await reprintBadge(badgeId)
       await printBadgeWindow(badgeId)
       const badge = badges.find(b => b.id === badgeId)
-      setNotification({ type: 'success', message: `Badge ${badge?.badge_number} reprinted successfully` })
+      showNotification('success', `Badge ${badge?.badge_number} reprinted successfully`)
       fetchBadges()
     } catch (err) {
-      setNotification({ type: 'error', message: err instanceof Error ? err.message : 'Failed to reprint badge' })
+      showNotification('error', err instanceof Error ? err.message : 'Failed to reprint badge')
     }
   }
 
@@ -64,10 +123,10 @@ export default function AdminBadgesPage() {
 
     try {
       await cancelBadge(badgeId)
-      setNotification({ type: 'success', message: 'Badge cancelled successfully' })
+      showNotification('success', 'Badge cancelled successfully')
       fetchBadges()
     } catch (err) {
-      setNotification({ type: 'error', message: err instanceof Error ? err.message : 'Failed to cancel badge' })
+      showNotification('error', err instanceof Error ? err.message : 'Failed to cancel badge')
     }
   }
 
@@ -112,25 +171,13 @@ export default function AdminBadgesPage() {
 
       pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight)
       pdf.save(`Visitor_Badge_${badge.badge_number}.pdf`)
-      setNotification({ type: 'success', message: 'Badge PDF downloaded' })
+      showNotification('success', 'Badge PDF downloaded')
     } catch (err) {
-      setNotification({ type: 'error', message: err instanceof Error ? err.message : 'Failed to download PDF' })
+      showNotification('error', err instanceof Error ? err.message : 'Failed to download PDF')
     }
   }
 
-  const filteredBadges = badges.filter(badge => {
-    const matchesSearch =
-      badge.badge_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      badge.qr_token.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      badge.visit?.visitor?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      badge.visit?.visitor?.visitor_organization?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      badge.visit?.employee?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-
-    const matchesStatus = statusFilter === 'all' || badge.badge_status === statusFilter
-    return matchesSearch && matchesStatus
-  })
-
-  if (loading) {
+  if (authChecking || loading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -223,7 +270,7 @@ export default function AdminBadgesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[rgba(85,107,47,0.25)]">
-                {filteredBadges.map((badge) => (
+                {badges.map((badge) => (
                   <tr key={badge.id} className="hover:bg-[#4B5320]/10 transition-colors">
                     <td className="px-4 py-3 font-medium text-[#F5F5DC]">{badge.badge_number}</td>
                     <td className="px-4 py-3 text-[#9A9F87]">{badge.visit?.visitor?.full_name || '—'}</td>
@@ -282,7 +329,7 @@ export default function AdminBadgesPage() {
               </tbody>
             </table>
           </div>
-          {filteredBadges.length === 0 && !loading && (
+          {badges.length === 0 && !loading && (
             <div className="p-12 text-center">
               <Shield className="h-12 w-12 text-gray-300 mx-auto mb-3" />
               <p className="text-[#9A9F87]">No badges found</p>
@@ -328,5 +375,3 @@ export default function AdminBadgesPage() {
     </div>
   )
 }
-
-

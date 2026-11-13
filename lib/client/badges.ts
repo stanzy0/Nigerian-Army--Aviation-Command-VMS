@@ -3,9 +3,15 @@ import { getAuthHeaders } from '@/lib/client/api'
 
 export type { VisitorBadge, BadgeFormData }
 
-export async function getBadges(): Promise<VisitorBadge[]> {
-  const res = await fetch('/api/badges', {
+export async function getBadges(search?: string, status?: string, signal?: AbortSignal): Promise<VisitorBadge[]> {
+  const params = new URLSearchParams()
+  if (search) params.set('search', search)
+  if (status && status !== 'all') params.set('status', status)
+  params.set('limit', '1000')
+
+  const res = await fetch(`/api/badges?${params.toString()}`, {
     headers: await getAuthHeaders(),
+    signal,
   })
   if (!res.ok) throw new Error('Failed to fetch badges')
   const json = await res.json()

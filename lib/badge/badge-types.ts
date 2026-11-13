@@ -4,12 +4,12 @@ export interface BadgeVisit {
   id: string
   visitor: {
     full_name: string
-    visitor_organization: string
+    visitor_organization: string | null
     photo_url?: string | null
   } | null
   employee: {
     full_name: string
-    department: string
+    department: string | null
   } | null
   purpose: string
   check_in_time: string | null

@@ -38,6 +38,7 @@ components:
         - `visitors:read` — Visitor list and detail
         - `visits:read` — Visit list
         - `departments:read` — Department list
+        - `visitor_phone:read` — Access to visitor phone number and phone-number filtering
   schemas:
     ErrorResponse:
       type: object
@@ -164,7 +165,7 @@ components:
           type: string
           enum: [Pending, Active, Returned, Expired, Cancelled, Lost, Damaged, Revoked]
           nullable: true
-      required: [badge_number, badge_status]
+      required: [badge_status]
     VisitListItem:
       type: object
       properties:
@@ -208,7 +209,6 @@ components:
             visitor_organization:
               type: string
               nullable: true
-          required: [full_name, visitor_organization]
         employee:
           type: object
           nullable: true
@@ -219,7 +219,6 @@ components:
             department:
               type: string
               nullable: true
-          required: [full_name, department]
         badges:
           type: array
           items:
@@ -307,19 +306,17 @@ components:
     fromParam:
       name: from
       in: query
-      description: Filter by created_at >= date (ISO 8601)
+      description: Filter by created_at >= date/time (ISO 8601)
       required: false
       schema:
         type: string
-        format: date
     toParam:
       name: to
       in: query
-      description: Filter by created_at <= date (ISO 8601)
+      description: Filter by created_at <= date/time (ISO 8601)
       required: false
       schema:
         type: string
-        format: date
     statusParam:
       name: status
       in: query
@@ -339,11 +336,17 @@ components:
     visitDateParam:
       name: visit_date
       in: query
-      description: Filter by scheduled_date (date only, ISO 8601)
+      description: Filter by scheduled_date (ISO 8601 date or date-time)
       required: false
       schema:
         type: string
-        format: date
+    phoneParam:
+      name: phone
+      in: query
+      description: Filter by visitor phone number (requires visitor_phone:read scope)
+      required: false
+      schema:
+        type: string
     visitorIdPathParam:
       name: id
       in: path
@@ -431,6 +434,7 @@ paths:
         - $ref: '#/components/parameters/searchParam'
         - $ref: '#/components/parameters/fromParam'
         - $ref: '#/components/parameters/toParam'
+        - $ref: '#/components/parameters/phoneParam'
       responses:
         '200':
           description: Successful response
@@ -522,6 +526,8 @@ paths:
                     error:
                       code: UNAUTHORIZED
                       message: "Integration key is inactive"
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':
@@ -571,6 +577,8 @@ paths:
                       message: "Invalid visitor ID format"
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
         '404':
           description: Visitor not found
           headers:
@@ -613,6 +621,7 @@ paths:
         - $ref: '#/components/parameters/statusParam'
         - $ref: '#/components/parameters/visitorIdParam'
         - $ref: '#/components/parameters/visitDateParam'
+        - $ref: '#/components/parameters/phoneParam'
       responses:
         '200':
           description: Successful response
@@ -621,6 +630,7 @@ paths:
               schema:
                 type: string
                 enum: [no-store]
+              description: Prevents caching of sensitive data
             X-RateLimit-Limit:
               schema:
                 type: integer
@@ -669,6 +679,8 @@ paths:
                       message: "Invalid visitor_id format"
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':
@@ -714,6 +726,8 @@ paths:
                 $ref: '#/components/schemas/DepartmentsResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':

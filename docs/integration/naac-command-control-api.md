@@ -104,6 +104,7 @@ GET /visitors
 | search | string | No | Search full_name, visitor_organization (case-insensitive substring) |
 | from | date (ISO 8601) | No | Filter: created_at >= from |
 | to | date (ISO 8601) | No | Filter: created_at <= to |
+| phone | string | No | Filter by visitor phone number (requires `visitor_phone:read` scope) |
 
 #### Response (200)
 
@@ -227,6 +228,7 @@ GET /visits
 | visitor_id | UUID | No | Filter by visitor ID |
 | visit_date | date (ISO 8601) | No | Filter by scheduled_date (date only) |
 | search | string | No | Search visitor full_name (case-insensitive substring) |
+| phone | string | No | Filter by visitor phone number (requires `visitor_phone:read` scope) |
 
 #### Response (200)
 
@@ -469,8 +471,11 @@ Expires: 2027-11-12T00:00:00Z
 
 ### Revoking Tokens
 
+Tokens can be revoked by integration key ID or by name:
+
 ```bash
-npx tsx scripts/revoke-api-token.mts --id <uuid>
+npx tsx scripts/revoke-api-token.mts --id "<uuid>"
+npx tsx scripts/revoke-api-token.mts --name "NAAC Command Control System"
 ```
 
 ---

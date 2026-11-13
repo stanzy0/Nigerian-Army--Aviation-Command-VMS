@@ -28,7 +28,7 @@ export interface Visit {
   check_out_time: string | null
   created_at: string
   qr_code: string | null
-  employee: { full_name: string; department: string } | null
+  employee: { full_name: string; department: string | null } | null
 }
 
 export interface VisitorFormData {

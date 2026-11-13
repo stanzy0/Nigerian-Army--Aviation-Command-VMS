@@ -28,45 +28,75 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status')
-    const search = searchParams.get('search')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const statusRaw = searchParams.get('status')
+    const status = statusRaw ? statusRaw.trim() : null
+    const statusLower = status ? status.toLowerCase() : null
+    const normalizedStatus = (!status || statusLower === 'all') ? null : status
+
+    const searchRaw = searchParams.get('search')
+    const search = searchRaw && searchRaw.trim() !== '' ? searchRaw.trim() : null
+
+    const parseStrictInt = (value: string | null, defaultValue: number, min: number, max: number): number => {
+      if (value === null) return defaultValue
+      // Reject empty strings, non-numeric strings, floats, and strings with trailing characters
+      if (value === '' || !/^\d+$/.test(value)) return NaN
+      const parsed = parseInt(value, 10)
+      if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) return NaN
+      if (parsed < min || parsed > max) return NaN
+      return parsed
+    }
+
+    const page = parseStrictInt(searchParams.get('page'), 1, 1, 2147483647)
+    const limit = parseStrictInt(searchParams.get('limit'), 20, 1, 1000)
+
+    if (Number.isNaN(page) || page < 1) {
+      return NextResponse.json({ success: false, message: 'Invalid page parameter', error: 'Bad request' }, { status: 400 })
+    }
+    if (Number.isNaN(limit) || limit < 1 || limit > 1000) {
+      return NextResponse.json({ success: false, message: 'Invalid limit parameter', error: 'Bad request' }, { status: 400 })
+    }
 
     if (!supabaseAdmin) {
-      return NextResponse.json({ success: false, message: 'Server configuration error', error: 'Service role key not configured' }, { status: 500 })
+      console.error('[GET /api/badges] Service role key not configured')
+      return NextResponse.json({ success: false, message: 'Server configuration error', error: 'Internal server error' }, { status: 500 })
     }
 
-    let query = supabaseAdmin
-      .from('visitor_badges')
-      .select('*, visit:visits(*, visitor:visitors(full_name, visitor_organization, email, photo_url), employee:employees(full_name, department, email))', { count: 'exact' })
-      .order('created_at', { ascending: false })
+    const { data: rpcResult, error: rpcError } = await supabaseAdmin
+      .rpc('search_badges', {
+        p_search_text: search || null,
+        p_status: normalizedStatus || null,
+        p_page: page,
+        p_limit: limit,
+      })
 
-    if (status && status !== 'all') {
-      query = query.eq('badge_status', status)
+    if (rpcError) {
+      console.error('[GET /api/badges] RPC error:', rpcError)
+      return NextResponse.json({ success: false, message: 'Failed to fetch badges', error: 'Internal server error' }, { status: 500 })
     }
 
-    if (search) {
-      query = query.or(`badge_number.ilike.%${search}%,qr_token.ilike.%${search}%`)
+    if (!rpcResult || typeof rpcResult !== 'object' || !('data' in rpcResult) || !('total' in rpcResult)) {
+      console.error('[GET /api/badges] Malformed RPC response:', rpcResult)
+      return NextResponse.json({ success: false, message: 'Invalid response from search function', error: 'Internal server error' }, { status: 500 })
     }
 
-    const from = (page - 1) * limit
-    const to = from + limit - 1
-    query = query.range(from, to)
+    const { data, total } = rpcResult
 
-     const { data, error, count } = await query
+    if (!Array.isArray(data)) {
+      console.error('[GET /api/badges] RPC data is not an array:', data)
+      return NextResponse.json({ success: false, message: 'Invalid response from search function', error: 'Internal server error' }, { status: 500 })
+    }
 
-     if (error) {
-       console.error('[GET /api/badges] error:', error)
-       return NextResponse.json({ success: false, message: error.message || 'Failed to fetch badges', error: error.message || 'Internal server error' }, { status: 500 })
-     }
+    if (typeof total !== 'number' || !Number.isFinite(total) || !Number.isInteger(total) || total < 0 || total > 2147483647) {
+      console.error('[GET /api/badges] Invalid RPC total:', total)
+      return NextResponse.json({ success: false, message: 'Invalid response from search function', error: 'Internal server error' }, { status: 500 })
+    }
 
     return NextResponse.json({
-      data: data || [],
-      total: count || 0,
+      data,
+      total,
       page,
       limit,
-      totalPages: Math.ceil((count || 0) / limit),
+      totalPages: Math.ceil(total / limit),
     })
   } catch (err) {
     console.error(err)

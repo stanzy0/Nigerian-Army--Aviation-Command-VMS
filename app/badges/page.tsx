@@ -44,6 +44,7 @@ export default function BadgesPage() {
   const [loading, setLoading] = useState(true)
   const [authChecking, setAuthChecking] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
@@ -57,29 +58,52 @@ export default function BadgesPage() {
   const [selectedBadge, setSelectedBadge] = useState<VisitorBadgeType | null>(null)
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const realtimeChannel = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const requestIdRef = useRef(0)
 
-  const showNotification = (type: 'success' | 'error', message: string) => {
+  const showNotification = useCallback((type: 'success' | 'error', message: string) => {
     setNotification({ type, message })
     setTimeout(() => setNotification(null), 3000)
-  }
+  }, [])
 
-  const fetchBadges = async () => {
-    setTimeout(() => setLoading(true), 0)
-    try {
-      const res = await fetch('/api/badges?limit=1000')
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        showNotification('error', err.error || err.message || 'Failed to fetch badges')
-        return
+  // Debounce search term (~400ms)
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 400)
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
       }
-      const result = await res.json()
-      setBadges(result.data || [])
+    }
+  }, [searchTerm])
+
+  const fetchBadges = useCallback(async () => {
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    const currentRequestId = ++requestIdRef.current
+
+    setLoading(true)
+    try {
+      const { getBadges } = await import('@/lib/client/badges')
+      const data = await getBadges(debouncedSearchTerm, statusFilter, controller.signal)
+      if (currentRequestId !== requestIdRef.current) return
+      setBadges(data || [])
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      if (currentRequestId !== requestIdRef.current) return
       showNotification('error', error instanceof Error ? error.message : 'Failed to fetch badges')
     } finally {
-      setTimeout(() => setLoading(false), 0)
+      if (currentRequestId === requestIdRef.current) {
+        setLoading(false)
+      }
     }
-  }
+  }, [debouncedSearchTerm, statusFilter, showNotification])
 
   const fetchVisits = async () => {
     try {
@@ -110,23 +134,28 @@ export default function BadgesPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const user = await getCurrentUser()
-      if (!user) {
+      try {
+        const user = await getCurrentUser()
+        if (!user) {
+          window.location.href = '/login'
+          return
+        }
+        if (!user.role) {
+          window.location.href = '/unauthorized'
+          return
+        }
+        if (!PERMISSIONS[user.role]?.includes('badges')) {
+          window.location.href = '/unauthorized'
+          return
+        }
+        setAuthChecking(false)
+        fetchVisits()
+        setupRealtime()
+      } catch (err) {
+        console.error('[Auth check failed]', err)
         window.location.href = '/login'
         return
       }
-      if (!user.role) {
-        window.location.href = '/unauthorized'
-        return
-      }
-      if (!PERMISSIONS[user.role]?.includes('badges')) {
-        window.location.href = '/unauthorized'
-        return
-      }
-      setAuthChecking(false)
-      fetchBadges()
-      fetchVisits()
-      setupRealtime()
     }
     checkAuth()
 
@@ -134,8 +163,16 @@ export default function BadgesPage() {
       if (realtimeChannel.current) {
         supabase.removeChannel(realtimeChannel.current)
       }
+      abortControllerRef.current?.abort()
     }
   }, [])
+
+  // Fetch badges when debounced search term or status filter changes, but only after auth
+  useEffect(() => {
+    if (!authChecking) {
+      fetchBadges()
+    }
+  }, [fetchBadges, authChecking])
 
   const handleGenerateBadge = async (visitId: string) => {
     try {
@@ -243,18 +280,6 @@ export default function BadgesPage() {
     }
   }
 
-  const filteredBadges = badges.filter(badge => {
-    const matchesSearch =
-      badge.badge_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      badge.qr_token.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      badge.visit?.visitor?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      badge.visit?.visitor?.visitor_organization?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      badge.visit?.employee?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-
-    const matchesStatus = statusFilter === 'all' || badge.badge_status === statusFilter
-    return matchesSearch && matchesStatus
-  })
-
   if (authChecking) {
     return (
       <div className="flex h-screen bg-gray-50 items-center justify-center">
@@ -360,7 +385,7 @@ export default function BadgesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[rgba(85,107,47,0.25)]">
-                  {filteredBadges.map((badge) => (
+                  {badges.map((badge) => (
                     <tr key={badge.id} className="hover:bg-[#4B5320]/10 transition-colors">
                       <td className="px-4 py-3">
                         <span className="font-mono font-medium text-[#F5F5DC]">{badge.badge_number}</span>
@@ -455,7 +480,7 @@ export default function BadgesPage() {
             )}
           </div>
 
-          {!loading && filteredBadges.length === 0 && (
+          {!loading && badges.length === 0 && (
             <div className="py-12 text-center">
               <p className="text-[#9A9F87]">No badges found</p>
             </div>
