@@ -196,9 +196,9 @@ Nigerian Army Aviation Command
         <section id="features" className="py-16 bg-[#141A10]">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto text-center">
-              <h2 className="text-xl sm:text-2xl font-bold text-[#F5F5DC] tracking-tight">About the Visitor Management System</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-[#F5F5DC] tracking-tight">About the Nigerian Army Aviation Command</h2>
               <p className="mt-4 text-sm sm:text-base text-[#9A9F87] leading-relaxed">
-                The Visitor Management System (VMS) is an integrated platform designed for the Nigerian Army Aviation Command. It provides secure visitor registration, host verification, access control, and real-time monitoring to maintain institutional security and accountability.
+                This integrated platform is designed for the Nigerian Army Aviation Command. It provides secure visitor registration, host verification, access control, and real-time monitoring to maintain institutional security and accountability.
               </p>
             </div>
           </div>

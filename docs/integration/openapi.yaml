@@ -1,0 +1,763 @@
+openapi: 3.0.3
+info:
+  title: NAAC Command Control External API
+  version: 1.0.0
+  description: |
+    Secure external API for Nigerian Army Aviation Command Visitor Management System.
+
+    **Authentication:** Bearer Token (Opaque API Key with SHA-256 verification)
+
+    **Rate Limit:** 100 requests/minute per integration key
+
+    **Security:** All responses include `Cache-Control: no-store`. Sensitive fields are never exposed.
+
+    **Audit Logging:** Every request is logged with integration identity, endpoint, outcome, and timing.
+  contact:
+    name: NAAC API Support
+    email: api-support@naac.gov.ng
+    url: https://api.naac.gov.ng/docs
+  license:
+    name: Proprietary
+    url: https://api.naac.gov.ng/license
+servers:
+  - url: https://api.naac.gov.ng/api/integration/v1
+    description: Production server
+  - url: https://staging-api.naac.gov.ng/api/integration/v1
+    description: Staging server
+security:
+  - BearerAuth: []
+tags:
+  - name: Visitors
+    description: Visitor management endpoints
+  - name: Visits
+    description: Visit management endpoints
+  - name: Departments
+    description: Department lookup endpoints
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Opaque API Key (format: `naac_live_<64_hex_characters>`).
+
+        The token is a 256-bit cryptographically random value. The server stores only the SHA-256 hash.
+
+        **Required Scopes:**
+        - `visitors:read` — Visitor list and detail
+        - `visits:read` — Visit list
+        - `departments:read` — Department list
+        - `visitor_phone:read` — Phone field access (optional)
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [UNAUTHORIZED, INSUFFICIENT_SCOPE, INVALID_PARAMETER, NOT_FOUND, RATE_LIMIT_EXCEEDED, INTERNAL_ERROR]
+            message:
+              type: string
+      required: [success, error]
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        total_pages:
+          type: integer
+          minimum: 0
+      required: [page, limit, total, total_pages]
+    VisitorListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+        visitor_organization:
+          type: string
+        phone:
+          type: string
+          nullable: true
+          description: Only present with visitor_phone:read scope
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [id, full_name, visitor_organization, created_at, updated_at]
+    VisitorDetail:
+      allOf:
+        - $ref: '#/components/schemas/VisitorListItem'
+        - type: object
+          properties:
+            visits:
+              type: array
+              items:
+                $ref: '#/components/schemas/VisitSummary'
+          required: [visits]
+    VisitSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        purpose:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, checked_in, checked_out, rejected]
+        scheduled_date:
+          type: string
+          format: date-time
+        check_in_time:
+          type: string
+          format: date-time
+          nullable: true
+        check_out_time:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        badges:
+          type: array
+          items:
+            type: object
+            properties:
+              badge_number:
+                type: string
+              badge_status:
+                type: string
+                enum: [Pending, Active, Returned, Expired, Cancelled, Lost, Damaged, Revoked]
+            required: [badge_number, badge_status]
+      required: [id, purpose, status, scheduled_date, created_at, updated_at]
+    VisitListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        visitor_id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        purpose:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, checked_in, checked_out, rejected]
+        scheduled_date:
+          type: string
+          format: date-time
+        check_in_time:
+          type: string
+          format: date-time
+          nullable: true
+        check_out_time:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        visitor:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            full_name:
+              type: string
+            visitor_organization:
+              type: string
+          required: [id, full_name, visitor_organization]
+        employee:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            full_name:
+              type: string
+            department:
+              type: string
+          required: [id, full_name, department]
+        badges:
+          type: array
+          items:
+            type: object
+            properties:
+              badge_number:
+                type: string
+              badge_status:
+                type: string
+                enum: [Pending, Active, Returned, Expired, Cancelled, Lost, Damaged, Revoked]
+            required: [badge_number, badge_status]
+      required: [id, visitor_id, employee_id, purpose, status, scheduled_date, created_at, updated_at, visitor, employee, badges]
+    DepartmentItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required: [id, name, created_at]
+    VisitorsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/VisitorListItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+      required: [success, data, pagination]
+    VisitorDetailResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: '#/components/schemas/VisitorDetail'
+      required: [success, data]
+    VisitsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/VisitListItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+      required: [success, data, pagination]
+    DepartmentsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DepartmentItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+      required: [success, data, pagination]
+  parameters:
+    pageParam:
+      name: page
+      in: query
+      description: Page number (1-based)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    limitParam:
+      name: limit
+      in: query
+      description: Items per page (max 100)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    searchParam:
+      name: search
+      in: query
+      description: Search term (full_name, visitor_organization, phone for visitors; name for departments)
+      required: false
+      schema:
+        type: string
+        maxLength: 255
+    fromParam:
+      name: from
+      in: query
+      description: Filter by created_at >= date (ISO 8601)
+      required: false
+      schema:
+        type: string
+        format: date
+    toParam:
+      name: to
+      in: query
+      description: Filter by created_at <= date (ISO 8601)
+      required: false
+      schema:
+        type: string
+        format: date
+    phoneParam:
+      name: phone
+      in: query
+      description: Filter by visitor phone (requires visitor_phone:read scope)
+      required: false
+      schema:
+        type: string
+    statusParam:
+      name: status
+      in: query
+      description: Filter by visit status
+      required: false
+      schema:
+        type: string
+        enum: [pending, approved, checked_in, checked_out, rejected]
+    visitDateParam:
+      name: visit_date
+      in: query
+      description: Filter by scheduled date (ISO 8601)
+      required: false
+      schema:
+        type: string
+        format: date
+    visitorIdParam:
+      name: id
+      in: path
+      description: Visitor UUID
+      required: true
+      schema:
+        type: string
+        format: uuid
+paths:
+  /visitors:
+    get:
+      tags: [Visitors]
+      summary: List visitors
+      description: |
+        Returns paginated list of visitors with approved fields only.
+
+        **Required Scope:** `visitors:read`
+
+        **Phone Field:** Requires additional `visitor_phone:read` scope
+      operationId: listVisitors
+      security:
+        - BearerAuth: [visitors:read]
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/searchParam'
+        - $ref: '#/components/parameters/fromParam'
+        - $ref: '#/components/parameters/toParam'
+        - $ref: '#/components/parameters/phoneParam'
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+              description: Prevents caching of sensitive data
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+                example: 100
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+                example: 99
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+                example: 1700000060
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitorsResponse'
+        '400':
+          description: Invalid parameters
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidDate:
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_PARAMETER
+                      message: "Invalid 'from' date format. Use YYYY-MM-DD"
+                fromAfterTo:
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_PARAMETER
+                      message: "'from' date cannot be after 'to' date"
+        '401':
+          description: Authentication failed
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingToken:
+                  value:
+                    success: false
+                    error:
+                      code: UNAUTHORIZED
+                      message: "Missing authorization token"
+                invalidToken:
+                  value:
+                    success: false
+                    error:
+                      code: UNAUTHORIZED
+                      message: "Invalid token"
+                expiredToken:
+                  value:
+                    success: false
+                    error:
+                      code: UNAUTHORIZED
+                      message: "Integration key has expired"
+                revokedToken:
+                  value:
+                    success: false
+                    error:
+                      code: UNAUTHORIZED
+                      message: "Integration key has been revoked"
+                inactiveToken:
+                  value:
+                    success: false
+                    error:
+                      code: UNAUTHORIZED
+                      message: "Integration key is inactive"
+        '403':
+          description: Insufficient scope
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                phoneScopeRequired:
+                  value:
+                    success: false
+                    error:
+                      code: INSUFFICIENT_SCOPE
+                      message: "Phone filter requires 'visitor_phone:read' scope"
+        '429':
+          description: Rate limit exceeded
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+            Retry-After:
+              schema:
+                type: string
+                example: "60"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rateLimited:
+                  value:
+                    success: false
+                    error:
+                      code: RATE_LIMIT_EXCEEDED
+                      message: "Rate limit exceeded. Try again later."
+        '500':
+          description: Internal server error
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /visitors/{id}:
+    get:
+      tags: [Visitors]
+      summary: Get visitor details
+      description: |
+        Returns single visitor with associated visits and badges.
+
+        **Required Scope:** `visitors:read`
+
+        **Phone Field:** Requires additional `visitor_phone:read` scope
+      operationId: getVisitor
+      security:
+        - BearerAuth: [visitors:read]
+      parameters:
+        - $ref: '#/components/parameters/visitorIdParam'
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitorDetailResponse'
+        '400':
+          description: Invalid UUID format
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidUuid:
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_PARAMETER
+                      message: "Invalid visitor ID format"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '404':
+          description: Visitor not found
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  value:
+                    success: false
+                    error:
+                      code: NOT_FOUND
+                      message: "Visitor not found"
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /visits:
+    get:
+      tags: [Visits]
+      summary: List visits
+      description: |
+        Returns paginated list of visits with visitor, employee, and badge info.
+
+        **Required Scope:** `visits:read`
+
+        **Field Protection:** `notes` field never exposed. Badge QR tokens never exposed.
+      operationId: listVisits
+      security:
+        - BearerAuth: [visits:read]
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/searchParam'
+        - $ref: '#/components/parameters/statusParam'
+        - $ref: '#/components/parameters/visitDateParam'
+        - $ref: '#/components/parameters/phoneParam'
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+                example: 100
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+                example: 99
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+                example: 1700000060
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitsResponse'
+        '400':
+          description: Invalid parameters
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidDate:
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_PARAMETER
+                      message: "Invalid 'visit_date' format. Use YYYY-MM-DD"
+                invalidStatus:
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_PARAMETER
+                      message: "Invalid status. Must be one of: pending, approved, checked_in, checked_out, rejected"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /departments:
+    get:
+      tags: [Departments]
+      summary: List departments
+      description: |
+        Returns paginated list of departments.
+
+        **Required Scope:** `departments:read`
+      operationId: listDepartments
+      security:
+        - BearerAuth: [departments:read]
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/limitParam'
+        - $ref: '#/components/parameters/searchParam'
+      responses:
+        '200':
+          description: Successful response
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+            X-RateLimit-Limit:
+              schema:
+                type: integer
+                example: 100
+            X-RateLimit-Remaining:
+              schema:
+                type: integer
+                example: 99
+            X-RateLimit-Reset:
+              schema:
+                type: integer
+                example: 1700000060
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/InsufficientScope'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+responses:
+  Unauthorized:
+    description: Authentication failed
+    headers:
+      Cache-Control:
+        schema:
+          type: string
+          enum: [no-store]
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  InsufficientScope:
+    description: Insufficient scope
+    headers:
+      Cache-Control:
+        schema:
+          type: string
+          enum: [no-store]
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  RateLimited:
+    description: Rate limit exceeded
+    headers:
+      Cache-Control:
+        schema:
+          type: string
+          enum: [no-store]
+      Retry-After:
+        schema:
+          type: string
+          example: "60"
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
+  InternalError:
+    description: Internal server error
+    headers:
+      Cache-Control:
+        schema:
+          type: string
+          enum: [no-store]
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ErrorResponse'
