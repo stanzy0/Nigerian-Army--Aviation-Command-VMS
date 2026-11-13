@@ -12,18 +12,9 @@ info:
     **Security:** All responses include `Cache-Control: no-store`. Sensitive fields are never exposed.
 
     **Audit Logging:** Every request is logged with integration identity, endpoint, outcome, and timing.
-  contact:
-    name: NAAC API Support
-    email: api-support@naac.gov.ng
-    url: https://api.naac.gov.ng/docs
-  license:
-    name: Proprietary
-    url: https://api.naac.gov.ng/license
 servers:
-  - url: https://api.naac.gov.ng/api/integration/v1
+  - url: https://nigeriaarmyaviationcommandvms.vercel.app/api/integration/v1
     description: Production server
-  - url: https://staging-api.naac.gov.ng/api/integration/v1
-    description: Staging server
 security:
   - BearerAuth: []
 tags:
@@ -43,11 +34,10 @@ components:
 
         The token is a 256-bit cryptographically random value. The server stores only the SHA-256 hash.
 
-        **Required Scopes:**
+        **Required Scopes (application-managed permissions):**
         - `visitors:read` — Visitor list and detail
         - `visits:read` — Visit list
         - `departments:read` — Department list
-        - `visitor_phone:read` — Phone field access (optional)
   schemas:
     ErrorResponse:
       type: object
@@ -91,10 +81,6 @@ components:
           type: string
         visitor_organization:
           type: string
-        phone:
-          type: string
-          nullable: true
-          description: Only present with visitor_phone:read scope
         created_at:
           type: string
           format: date-time
@@ -102,91 +88,13 @@ components:
           type: string
           format: date-time
       required: [id, full_name, visitor_organization, created_at, updated_at]
-    VisitorDetail:
-      allOf:
-        - $ref: '#/components/schemas/VisitorListItem'
-        - type: object
-          properties:
-            visits:
-              type: array
-              items:
-                $ref: '#/components/schemas/VisitSummary'
-          required: [visits]
-    VisitSummary:
+    VisitorDetailResponse:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-        purpose:
-          type: string
-        status:
-          type: string
-          enum: [pending, approved, checked_in, checked_out, rejected]
-        scheduled_date:
-          type: string
-          format: date-time
-        check_in_time:
-          type: string
-          format: date-time
-          nullable: true
-        check_out_time:
-          type: string
-          format: date-time
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        badges:
-          type: array
-          items:
-            type: object
-            properties:
-              badge_number:
-                type: string
-              badge_status:
-                type: string
-                enum: [Pending, Active, Returned, Expired, Cancelled, Lost, Damaged, Revoked]
-            required: [badge_number, badge_status]
-      required: [id, purpose, status, scheduled_date, created_at, updated_at]
-    VisitListItem:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        visitor_id:
-          type: string
-          format: uuid
-        employee_id:
-          type: string
-          format: uuid
-        purpose:
-          type: string
-        status:
-          type: string
-          enum: [pending, approved, checked_in, checked_out, rejected]
-        scheduled_date:
-          type: string
-          format: date-time
-        check_in_time:
-          type: string
-          format: date-time
-          nullable: true
-        check_out_time:
-          type: string
-          format: date-time
-          nullable: true
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        visitor:
+        success:
+          type: boolean
+          enum: [true]
+        data:
           type: object
           properties:
             id:
@@ -196,64 +104,127 @@ components:
               type: string
             visitor_organization:
               type: string
-          required: [id, full_name, visitor_organization]
-        employee:
-          type: object
-          properties:
-            id:
+            created_at:
               type: string
-              format: uuid
-            full_name:
+              format: date-time
+            updated_at:
               type: string
-            department:
-              type: string
-          required: [id, full_name, department]
-        badges:
-          type: array
-          items:
-            type: object
-            properties:
-              badge_number:
-                type: string
-              badge_status:
-                type: string
-                enum: [Pending, Active, Returned, Expired, Cancelled, Lost, Damaged, Revoked]
-            required: [badge_number, badge_status]
-      required: [id, visitor_id, employee_id, purpose, status, scheduled_date, created_at, updated_at, visitor, employee, badges]
-    DepartmentItem:
+              format: date-time
+            visits:
+              type: array
+              items:
+                $ref: '#/components/schemas/VisitWithBadges'
+          required: [id, full_name, visitor_organization, created_at, updated_at, visits]
+      required: [success, data]
+    VisitWithBadges:
       type: object
       properties:
         id:
           type: string
           format: uuid
-        name:
+        purpose:
           type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, approved, checked_in, checked_out, rejected]
+          nullable: true
+        scheduled_date:
+          type: string
+          format: date-time
+          nullable: true
+        check_in_time:
+          type: string
+          format: date-time
+          nullable: true
+        check_out_time:
+          type: string
+          format: date-time
+          nullable: true
         created_at:
           type: string
           format: date-time
-      required: [id, name, created_at]
-    VisitorsResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-          enum: [true]
-        data:
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        badges:
           type: array
           items:
-            $ref: '#/components/schemas/VisitorListItem'
-        pagination:
-          $ref: '#/components/schemas/Pagination'
-      required: [success, data, pagination]
-    VisitorDetailResponse:
+            $ref: '#/components/schemas/BadgeInfo'
+      required: [id, purpose, status, scheduled_date, created_at, updated_at, badges]
+    BadgeInfo:
       type: object
       properties:
-        success:
-          type: boolean
-          enum: [true]
-        data:
-          $ref: '#/components/schemas/VisitorDetail'
-      required: [success, data]
+        badge_number:
+          type: string
+          nullable: true
+        badge_status:
+          type: string
+          enum: [Pending, Active, Returned, Expired, Cancelled, Lost, Damaged, Revoked]
+          nullable: true
+      required: [badge_number, badge_status]
+    VisitListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        purpose:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, approved, checked_in, checked_out, rejected]
+          nullable: true
+        scheduled_date:
+          type: string
+          format: date-time
+          nullable: true
+        check_in_time:
+          type: string
+          format: date-time
+          nullable: true
+        check_out_time:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+        visitor:
+          type: object
+          nullable: true
+          properties:
+            full_name:
+              type: string
+              nullable: true
+            visitor_organization:
+              type: string
+              nullable: true
+          required: [full_name, visitor_organization]
+        employee:
+          type: object
+          nullable: true
+          properties:
+            full_name:
+              type: string
+              nullable: true
+            department:
+              type: string
+              nullable: true
+          required: [full_name, department]
+        badges:
+          type: array
+          items:
+            $ref: '#/components/schemas/BadgeInfo'
+      required: [id, purpose, status, scheduled_date, created_at, updated_at, visitor, employee, badges]
     VisitsResponse:
       type: object
       properties:
@@ -267,6 +238,19 @@ components:
         pagination:
           $ref: '#/components/schemas/Pagination'
       required: [success, data, pagination]
+    DepartmentItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, name, created_at]
     DepartmentsResponse:
       type: object
       properties:
@@ -280,11 +264,24 @@ components:
         pagination:
           $ref: '#/components/schemas/Pagination'
       required: [success, data, pagination]
+    VisitorsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/VisitorListItem'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+      required: [success, data, pagination]
   parameters:
     pageParam:
       name: page
       in: query
-      description: Page number (1-based)
+      description: "Page number (default: 1)"
       required: false
       schema:
         type: integer
@@ -293,7 +290,7 @@ components:
     limitParam:
       name: limit
       in: query
-      description: Items per page (max 100)
+      description: "Items per page, max 100 (default: 20)"
       required: false
       schema:
         type: integer
@@ -303,11 +300,10 @@ components:
     searchParam:
       name: search
       in: query
-      description: Search term (full_name, visitor_organization, phone for visitors; name for departments)
+      description: Search full_name, visitor_organization (visitors); name (departments); visitor full_name (visits)
       required: false
       schema:
         type: string
-        maxLength: 255
     fromParam:
       name: from
       in: query
@@ -324,13 +320,6 @@ components:
       schema:
         type: string
         format: date
-    phoneParam:
-      name: phone
-      in: query
-      description: Filter by visitor phone (requires visitor_phone:read scope)
-      required: false
-      schema:
-        type: string
     statusParam:
       name: status
       in: query
@@ -339,22 +328,91 @@ components:
       schema:
         type: string
         enum: [pending, approved, checked_in, checked_out, rejected]
+    visitorIdParam:
+      name: visitor_id
+      in: query
+      description: Filter by visitor ID (UUID)
+      required: false
+      schema:
+        type: string
+        format: uuid
     visitDateParam:
       name: visit_date
       in: query
-      description: Filter by scheduled date (ISO 8601)
+      description: Filter by scheduled_date (date only, ISO 8601)
       required: false
       schema:
         type: string
         format: date
-    visitorIdParam:
+    visitorIdPathParam:
       name: id
       in: path
-      description: Visitor UUID
       required: true
+      description: Visitor UUID
       schema:
         type: string
         format: uuid
+  responses:
+    Unauthorized:
+      description: Authentication failed
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            enum: [no-store]
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InsufficientScope:
+      description: Insufficient scope
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            enum: [no-store]
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            enum: [no-store]
+        Retry-After:
+          schema:
+            type: string
+            example: "60"
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+            example: 100
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+            example: 0
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+            example: 1700000060
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Internal server error
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            enum: [no-store]
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
 paths:
   /visitors:
     get:
@@ -364,8 +422,6 @@ paths:
         Returns paginated list of visitors with approved fields only.
 
         **Required Scope:** `visitors:read`
-
-        **Phone Field:** Requires additional `visitor_phone:read` scope
       operationId: listVisitors
       security:
         - BearerAuth: [visitors:read]
@@ -375,7 +431,6 @@ paths:
         - $ref: '#/components/parameters/searchParam'
         - $ref: '#/components/parameters/fromParam'
         - $ref: '#/components/parameters/toParam'
-        - $ref: '#/components/parameters/phoneParam'
       responses:
         '200':
           description: Successful response
@@ -467,57 +522,10 @@ paths:
                     error:
                       code: UNAUTHORIZED
                       message: "Integration key is inactive"
-        '403':
-          description: Insufficient scope
-          headers:
-            Cache-Control:
-              schema:
-                type: string
-                enum: [no-store]
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                phoneScopeRequired:
-                  value:
-                    success: false
-                    error:
-                      code: INSUFFICIENT_SCOPE
-                      message: "Phone filter requires 'visitor_phone:read' scope"
         '429':
-          description: Rate limit exceeded
-          headers:
-            Cache-Control:
-              schema:
-                type: string
-                enum: [no-store]
-            Retry-After:
-              schema:
-                type: string
-                example: "60"
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                rateLimited:
-                  value:
-                    success: false
-                    error:
-                      code: RATE_LIMIT_EXCEEDED
-                      message: "Rate limit exceeded. Try again later."
+          $ref: '#/components/responses/RateLimited'
         '500':
-          description: Internal server error
-          headers:
-            Cache-Control:
-              schema:
-                type: string
-                enum: [no-store]
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/InternalError'
   /visitors/{id}:
     get:
       tags: [Visitors]
@@ -526,13 +534,11 @@ paths:
         Returns single visitor with associated visits and badges.
 
         **Required Scope:** `visitors:read`
-
-        **Phone Field:** Requires additional `visitor_phone:read` scope
       operationId: getVisitor
       security:
         - BearerAuth: [visitors:read]
       parameters:
-        - $ref: '#/components/parameters/visitorIdParam'
+        - $ref: '#/components/parameters/visitorIdPathParam'
       responses:
         '200':
           description: Successful response
@@ -565,8 +571,6 @@ paths:
                       message: "Invalid visitor ID format"
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/InsufficientScope'
         '404':
           description: Visitor not found
           headers:
@@ -607,8 +611,8 @@ paths:
         - $ref: '#/components/parameters/limitParam'
         - $ref: '#/components/parameters/searchParam'
         - $ref: '#/components/parameters/statusParam'
+        - $ref: '#/components/parameters/visitorIdParam'
         - $ref: '#/components/parameters/visitDateParam'
-        - $ref: '#/components/parameters/phoneParam'
       responses:
         '200':
           description: Successful response
@@ -657,10 +661,14 @@ paths:
                     error:
                       code: INVALID_PARAMETER
                       message: "Invalid status. Must be one of: pending, approved, checked_in, checked_out, rejected"
+                invalidUuid:
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_PARAMETER
+                      message: "Invalid visitor_id format"
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/InsufficientScope'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':
@@ -706,58 +714,7 @@ paths:
                 $ref: '#/components/schemas/DepartmentsResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/InsufficientScope'
         '429':
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
-responses:
-  Unauthorized:
-    description: Authentication failed
-    headers:
-      Cache-Control:
-        schema:
-          type: string
-          enum: [no-store]
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
-  InsufficientScope:
-    description: Insufficient scope
-    headers:
-      Cache-Control:
-        schema:
-          type: string
-          enum: [no-store]
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
-  RateLimited:
-    description: Rate limit exceeded
-    headers:
-      Cache-Control:
-        schema:
-          type: string
-          enum: [no-store]
-      Retry-After:
-        schema:
-          type: string
-          example: "60"
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'
-  InternalError:
-    description: Internal server error
-    headers:
-      Cache-Control:
-        schema:
-          type: string
-          enum: [no-store]
-    content:
-      application/json:
-        schema:
-          $ref: '#/components/schemas/ErrorResponse'

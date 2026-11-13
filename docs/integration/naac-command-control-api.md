@@ -1,7 +1,7 @@
 # NAAC Command Control External API
 
 **Version:** 1.0.0
-**Base URL:** `https://api.naac.gov.ng/api/integration/v1`
+**Base URL:** `https://nigeriaarmyaviationcommandvms.vercel.app/api/integration/v1`
 **Authentication:** Bearer Token (Opaque API Key)
 **Rate Limit:** 100 requests/minute per integration
 **Content-Type:** `application/json`
@@ -15,12 +15,12 @@ The NAAC Command Control External API provides secure, audited access to visitor
 ### Key Features
 
 - **Opaque API Key Authentication** with SHA-256 hash verification (256-bit entropy)
-- **Scope-based Authorization** (visitors:read, visits:read, departments:read, visitor_phone:read)
+- **Scope-based Authorization** (visitors:read, visits:read, departments:read)
 - **Fixed-window Rate Limiting** (100 req/min) with atomic PostgreSQL RPC
 - **Comprehensive Audit Logging** for all requests (success, failures, rate limits)
 - **Field-level Data Protection** — sensitive fields never exposed
 - **Cache-Control: no-store** on all responses
-- **Cursor-based Pagination** with exact total counts
+- **Page-based Pagination** with exact total counts
 
 ---
 
@@ -39,18 +39,20 @@ The token is a 256-bit cryptographically random value (32 bytes from `crypto.ran
 ```bash
 curl -H "Authorization: Bearer naac_live_..." \
      -H "Accept: application/json" \
-     https://api.naac.gov.ng/api/integration/v1/visitors
+     https://nigeriaarmyaviationcommandvms.vercel.app/api/integration/v1/visitors
 ```
 
 ### Error Responses
 
 | Status | Code | Description |
 |--------|------|-------------|
-| 401 | UNAUTHORIZED | Missing, invalid, expired, or revoked token |
+| 401 | UNAUTHORIZED | Missing, invalid, expired, revoked, or inactive token |
 | 403 | INSUFFICIENT_SCOPE | Token lacks required scope for endpoint |
 | 429 | RATE_LIMIT_EXCEEDED | Rate limit exceeded (see Retry-After header) |
 
 All error responses include `Cache-Control: no-store`.
+
+The API token is supplied by the NAAC VMS administrator through an approved secure channel. Do not share or expose the token.
 
 ---
 
@@ -70,7 +72,7 @@ Rate limiting is enforced via atomic PostgreSQL RPC `api_integration_rate_limit_
 
 ## Audit Logging
 
-Every request is logged to `api_integration_audit_log` with:
+Every request is logged to `api_integration_audit_logs` with:
 
 - Integration key ID and name
 - Endpoint and HTTP method
@@ -92,7 +94,6 @@ GET /visitors
 ```
 
 **Required Scope:** `visitors:read`
-**Phone Scope:** `visitor_phone:read` (optional, for phone field)
 
 #### Query Parameters
 
@@ -100,10 +101,9 @@ GET /visitors
 |-----------|------|----------|-------------|
 | page | integer | No | Page number (default: 1) |
 | limit | integer | No | Items per page, max 100 (default: 20) |
-| search | string | No | Search full_name, visitor_organization, phone |
+| search | string | No | Search full_name, visitor_organization (case-insensitive substring) |
 | from | date (ISO 8601) | No | Filter: created_at >= from |
 | to | date (ISO 8601) | No | Filter: created_at <= to |
-| phone | string | No | Filter by phone (requires visitor_phone:read) |
 
 #### Response (200)
 
@@ -115,7 +115,6 @@ GET /visitors
       "id": "uuid",
       "full_name": "John Doe",
       "visitor_organization": "Test Corp",
-      "phone": "+2348012345678",
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z"
     }
@@ -130,17 +129,17 @@ GET /visitors
 ```
 
 **Field Notes:**
-- `phone` is `null` unless `visitor_phone:read` scope is granted
-- Sensitive fields **never included**: `photo_url`, `nationality`, `gender`, `email`, `visitor_address`, `emergency_contact`, `doc_type`, `doc_number`, `issuing_country`, `expiry_date`, `doc_front_url`, `doc_back_url`, `qr_code`, `qr_token`
+- `phone` is omitted when the token lacks `visitor_phone:read` scope (the issued token does not include this scope)
+- Sensitive fields **never included**: `photo_url`, `nationality`, `gender`, `email`, `visitor_address`, `emergency_contact`, `doc_type`, `doc_number`, `issuing_country`, `expiry_date`, `doc_front_url`, `doc_back_url`, `qr_code`, `qr_token`, `vehicle_plate`, `vehicle_type`, `notes`
 
 #### Error Responses
 
 | Status | Code | Condition |
 |--------|------|-----------|
 | 400 | INVALID_PARAMETER | Invalid date format, from > to |
-| 403 | INSUFFICIENT_SCOPE | Phone filter used without visitor_phone:read |
 | 401 | UNAUTHORIZED | Auth failures |
 | 429 | RATE_LIMIT_EXCEEDED | Rate limit hit |
+| 500 | INTERNAL_ERROR | Server error |
 
 ---
 
@@ -151,7 +150,6 @@ GET /visitors/{id}
 ```
 
 **Required Scope:** `visitors:read`
-**Phone Scope:** `visitor_phone:read` (optional, for phone field)
 
 #### Path Parameters
 
@@ -168,7 +166,6 @@ GET /visitors/{id}
     "id": "uuid",
     "full_name": "John Doe",
     "visitor_organization": "Test Corp",
-    "phone": "+2348012345678",
     "created_at": "2026-01-01T00:00:00Z",
     "updated_at": "2026-01-01T00:00:00Z",
     "visits": [
@@ -194,19 +191,21 @@ GET /visitors/{id}
 ```
 
 **Field Notes:**
-- `phone` is `null` unless `visitor_phone:read` scope is granted
+- `phone` is omitted when the token lacks `visitor_phone:read` scope (the issued token does not include this scope)
 - `visits` array includes all visits for this visitor
 - Each visit includes a `badges` array (multiple badges per visit supported)
 - `badge_status` is an enum: `Pending`, `Active`, `Returned`, `Expired`, `Cancelled`, `Lost`, `Damaged`, `Revoked`
+- Sensitive fields **never included**: document details, emergency contact, photo, QR tokens, nationality, gender, email, address, vehicle info, notes
 
 #### Error Responses
 
 | Status | Code | Condition |
 |--------|------|-----------|
 | 400 | INVALID_PARAMETER | Invalid UUID format |
-| 404 | NOT_FOUND | Visitor not found |
 | 401 | UNAUTHORIZED | Auth failures |
+| 404 | NOT_FOUND | Visitor not found |
 | 429 | RATE_LIMIT_EXCEEDED | Rate limit hit |
+| 500 | INTERNAL_ERROR | Server error |
 
 ---
 
@@ -225,9 +224,9 @@ GET /visits
 | page | integer | No | Page number (default: 1) |
 | limit | integer | No | Items per page, max 100 (default: 20) |
 | status | string | No | Filter: pending, approved, checked_in, checked_out, rejected |
+| visitor_id | UUID | No | Filter by visitor ID |
 | visit_date | date (ISO 8601) | No | Filter by scheduled_date (date only) |
-| from | date (ISO 8601) | No | Filter: scheduled_date >= from |
-| to | date (ISO 8601) | No | Filter: scheduled_date <= to |
+| search | string | No | Search visitor full_name (case-insensitive substring) |
 
 #### Response (200)
 
@@ -237,19 +236,21 @@ GET /visits
   "data": [
     {
       "id": "uuid",
-      "visitor_id": "uuid",
-      "visitor_name": "John Doe",
-      "visitor_organization": "Test Corp",
       "purpose": "Business meeting",
       "status": "approved",
       "scheduled_date": "2026-01-15T10:00:00Z",
       "check_in_time": "2026-01-15T10:05:00Z",
       "check_out_time": "2026-01-15T12:00:00Z",
-      "host_employee_id": "uuid",
-      "host_name": "Jane Smith",
-      "host_department": "Operations",
       "created_at": "2026-01-01T00:00:00Z",
       "updated_at": "2026-01-01T00:00:00Z",
+      "visitor": {
+        "full_name": "John Doe",
+        "visitor_organization": "Test Corp"
+      },
+      "employee": {
+        "full_name": "Jane Smith",
+        "department": "Operations"
+      },
       "badges": [
         {
           "badge_number": "BADGE-001",
@@ -270,15 +271,19 @@ GET /visits
 **Field Notes:**
 - Each visit includes a `badges` array (multiple badges per visit supported)
 - `badge_status` is an enum: `Pending`, `Active`, `Returned`, `Expired`, `Cancelled`, `Lost`, `Damaged`, `Revoked`
-- `host_employee_id`, `host_name`, `host_department` may be `null` if host not assigned
+- `visitor` object contains visitor details (may be `null` if not linked)
+- `employee` object contains host employee details (may be `null` if not assigned)
+- Internal UUIDs (`visitor_id`, `employee_id`, `visitor.id`, `employee.id`) are not exposed
+- Sensitive fields **never included**: `notes`, `photo_url`, `nationality`, `gender`, `emergency_contact`, `doc_number`, `doc_front_url`, `doc_back_url`, `qr_token`, `qr_code`, `visitor_address`, `vehicle_plate`, `vehicle_type`, `email`
 
 #### Error Responses
 
 | Status | Code | Condition |
 |--------|------|-----------|
-| 400 | INVALID_PARAMETER | Invalid date format, from > to, invalid status |
+| 400 | INVALID_PARAMETER | Invalid date format, invalid status, invalid UUID |
 | 401 | UNAUTHORIZED | Auth failures |
 | 429 | RATE_LIMIT_EXCEEDED | Rate limit hit |
+| 500 | INTERNAL_ERROR | Server error |
 
 ---
 
@@ -296,7 +301,7 @@ GET /departments
 |-----------|------|----------|-------------|
 | page | integer | No | Page number (default: 1) |
 | limit | integer | No | Items per page, max 100 (default: 20) |
-| search | string | No | Search department name |
+| search | string | No | Search department name (case-insensitive substring) |
 
 #### Response (200)
 
@@ -307,9 +312,7 @@ GET /departments
     {
       "id": "uuid",
       "name": "Operations",
-      "description": "Core operations department",
-      "created_at": "2026-01-01T00:00:00Z",
-      "updated_at": "2026-01-01T00:00:00Z"
+      "created_at": "2026-01-01T00:00:00Z"
     }
   ],
   "pagination": {
@@ -321,13 +324,17 @@ GET /departments
 }
 ```
 
+**Field Notes:**
+- Only `id`, `name`, and `created_at` are returned
+- No `description` or `updated_at` fields
+
 #### Error Responses
 
 | Status | Code | Condition |
 |--------|------|-----------|
-| 400 | INVALID_PARAMETER | Invalid page/limit |
 | 401 | UNAUTHORIZED | Auth failures |
 | 429 | RATE_LIMIT_EXCEEDED | Rate limit hit |
+| 500 | INTERNAL_ERROR | Server error |
 
 ---
 
@@ -373,7 +380,7 @@ class NAACApiClient {
     return this.request(`/visitors/${id}`);
   }
 
-  visits(params?: { page?: number; limit?: number; status?: string; visit_date?: string }) {
+  visits(params?: { page?: number; limit?: number; status?: string; visitor_id?: string; visit_date?: string; search?: string }) {
     return this.request('/visits', params);
   }
 
@@ -384,7 +391,7 @@ class NAACApiClient {
 
 // Usage
 const client = new NAACApiClient(
-  'https://api.naac.gov.ng/api/integration/v1',
+  'https://nigeriaarmyaviationcommandvms.vercel.app/api/integration/v1',
   process.env.NAAC_API_TOKEN!
 );
 
@@ -430,7 +437,7 @@ class NAACApiClient:
 
 # Usage
 client = NAACApiClient(
-    'https://api.naac.gov.ng/api/integration/v1',
+    'https://nigeriaarmyaviationcommandvms.vercel.app/api/integration/v1',
     os.environ['NAAC_API_TOKEN']
 )
 
@@ -443,7 +450,7 @@ visitors = client.visitors(page=1, limit=20)
 
 ### Issuing Tokens
 
-Use the provided script:
+Tokens are issued by the NAAC VMS administrator. Use the provided script:
 
 ```bash
 npx tsx scripts/issue-api-token.mts \
@@ -491,6 +498,4 @@ npx tsx scripts/revoke-api-token.mts --id <uuid>
 
 ## Support
 
-- **Email:** api-support@naac.gov.ng
-- **Documentation:** https://api.naac.gov.ng/docs
-- **Status Page:** https://status.naac.gov.ng
+For support, contact the NAAC VMS administrator through approved channels.

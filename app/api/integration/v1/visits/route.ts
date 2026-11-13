@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
     let query = supabaseAdmin
       .from('visits')
       .select(
-        'id, visitor_id, employee_id, purpose, status, scheduled_date, check_in_time, check_out_time, created_at, updated_at, visitor:visitors(id, full_name, visitor_organization), employee:employees(id, full_name, department), badges:visitor_badges(badge_number, badge_status)',
+        'id, visitor_id, employee_id, purpose, status, scheduled_date, check_in_time, check_out_time, created_at, updated_at, visitor:visitors(full_name, visitor_organization), employee:employees(full_name, department), badges:visitor_badges(badge_number, badge_status)',
         { count: 'exact' }
       )
       .order('scheduled_date', { ascending: false });
@@ -187,13 +187,11 @@ export async function GET(request: NextRequest) {
       check_out_time: string | null;
       created_at: string | null;
       updated_at: string | null;
-      visitor: { id: string; full_name: string | null; visitor_organization: string | null } | null;
-      employee: { id: string; full_name: string | null; department: string | null } | null;
+      visitor: { full_name: string | null; visitor_organization: string | null } | null;
+      employee: { full_name: string | null; department: string | null } | null;
       badges: Array<{ badge_number: string | null; badge_status: string | null }>;
     }) => ({
       id: v.id,
-      visitor_id: v.visitor_id,
-      employee_id: v.employee_id,
       purpose: v.purpose || null,
       status: v.status || null,
       scheduled_date: v.scheduled_date || null,
@@ -203,14 +201,12 @@ export async function GET(request: NextRequest) {
       updated_at: v.updated_at || null,
       visitor: v.visitor
         ? {
-            id: v.visitor.id,
             full_name: v.visitor.full_name || null,
             visitor_organization: v.visitor.visitor_organization || null,
           }
         : null,
       employee: v.employee
         ? {
-            id: v.employee.id,
             full_name: v.employee.full_name || null,
             department: v.employee.department || null,
           }

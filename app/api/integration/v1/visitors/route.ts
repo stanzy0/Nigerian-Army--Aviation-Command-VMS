@@ -227,14 +227,19 @@ export async function GET(request: NextRequest) {
       phone: string | null;
       created_at: string | null;
       updated_at: string | null;
-    }) => ({
-      id: v.id,
-      full_name: v.full_name || 'Unknown',
-      visitor_organization: v.visitor_organization || null,
-      phone: authResult.scopes.includes('visitor_phone:read') ? v.phone || null : null,
-      created_at: v.created_at || null,
-      updated_at: v.updated_at || null,
-    }));
+    }) => {
+      const base = {
+        id: v.id,
+        full_name: v.full_name || 'Unknown',
+        visitor_organization: v.visitor_organization || null,
+        created_at: v.created_at || null,
+        updated_at: v.updated_at || null,
+      };
+      if (authResult.scopes.includes('visitor_phone:read')) {
+        return { ...base, phone: v.phone || null };
+      }
+      return base;
+    });
 
     await logApiAccess({
       integrationKeyId: integrationId,

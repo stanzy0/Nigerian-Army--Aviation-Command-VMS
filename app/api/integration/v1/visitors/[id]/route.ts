@@ -148,41 +148,46 @@ export async function GET(
     }
 
     // 5. Map to response DTO
-    const visitor = {
-      id: data.id,
-      full_name: data.full_name || 'Unknown',
-      visitor_organization: data.visitor_organization || null,
-      phone: authResult.scopes.includes('visitor_phone:read') ? data.phone || null : null,
-      created_at: data.created_at || null,
-      updated_at: data.updated_at || null,
-      visits: (data.visit || []).map((v: {
-        id: string;
-        purpose: string | null;
-        status: string | null;
-        scheduled_date: string | null;
-        check_in_time: string | null;
-        check_out_time: string | null;
-        created_at: string | null;
-        updated_at: string | null;
-        badges: {
-          badge_number: string;
-          badge_status: string;
-        }[] | null;
-      }) => ({
-        id: v.id,
-        purpose: v.purpose || null,
-        status: v.status || null,
-        scheduled_date: v.scheduled_date || null,
-        check_in_time: v.check_in_time || null,
-        check_out_time: v.check_out_time || null,
-        created_at: v.created_at || null,
-        updated_at: v.updated_at || null,
-        badges: (v.badges || []).map((b: { badge_number: string; badge_status: string }) => ({
-          badge_number: b.badge_number || null,
-          badge_status: b.badge_status || null,
+    const visitor = (() => {
+      const base = {
+        id: data.id,
+        full_name: data.full_name || 'Unknown',
+        visitor_organization: data.visitor_organization || null,
+        created_at: data.created_at || null,
+        updated_at: data.updated_at || null,
+        visits: (data.visit || []).map((v: {
+          id: string;
+          purpose: string | null;
+          status: string | null;
+          scheduled_date: string | null;
+          check_in_time: string | null;
+          check_out_time: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+          badges: {
+            badge_number: string;
+            badge_status: string;
+          }[] | null;
+        }) => ({
+          id: v.id,
+          purpose: v.purpose || null,
+          status: v.status || null,
+          scheduled_date: v.scheduled_date || null,
+          check_in_time: v.check_in_time || null,
+          check_out_time: v.check_out_time || null,
+          created_at: v.created_at || null,
+          updated_at: v.updated_at || null,
+          badges: (v.badges || []).map((b: { badge_number: string; badge_status: string }) => ({
+            badge_number: b.badge_number || null,
+            badge_status: b.badge_status || null,
+          })),
         })),
-      })),
-    };
+      };
+      if (authResult.scopes.includes('visitor_phone:read')) {
+        return { ...base, phone: data.phone || null };
+      }
+      return base;
+    })();
 
     await logApiAccess({
       integrationKeyId: integrationId,

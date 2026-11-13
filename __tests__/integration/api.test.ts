@@ -359,7 +359,7 @@ describe('NAAC External API Integration', () => {
       expect(body.data[0]).toHaveProperty('id');
       expect(body.data[0]).toHaveProperty('full_name');
       expect(body.data[0]).toHaveProperty('visitor_organization');
-      expect(body.data[0]).toHaveProperty('phone');
+      expect(body.data[0]).not.toHaveProperty('phone');
       expect(body.data[0]).toHaveProperty('created_at');
       expect(body.data[0]).toHaveProperty('updated_at');
     });
@@ -494,7 +494,7 @@ describe('NAAC External API Integration', () => {
       const response = await getVisitors(request);
 
       const body = await response.json();
-      expect(body.data[0].phone).toBeNull();
+      expect(body.data[0]).not.toHaveProperty('phone');
     });
 
     it('returns phone with visitor_phone:read scope', async () => {
