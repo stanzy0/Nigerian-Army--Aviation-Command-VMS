@@ -225,9 +225,7 @@ export default function EmployeesPage() {
     }))
   }
 
-  const filteredOfficeLocations = formData.department_id
-    ? officeLocations.filter(l => l.department === formData.department)
-    : officeLocations
+  const filteredOfficeLocations = officeLocations
 
   if (authChecking) {
     return (
@@ -427,10 +425,10 @@ export default function EmployeesPage() {
                       options={filteredOfficeLocations.map((l) => ({ value: l.id, label: l.display_name || l.name }))}
                       value={formData.office_location_id || ''}
                       onChange={handleOfficeLocationChange}
-                      placeholder={formData.department_id ? 'Select office location...' : 'Select a department first...'}
+                      placeholder="Select office location..."
                       searchPlaceholder="Search office locations..."
-                      noResultsText={formData.department_id ? 'No office locations found for this department' : 'Select a department first'}
-                      disabled={!formData.department_id}
+                      noResultsText="No office locations found"
+                      disabled={false}
                       loading={loadingLookups}
                       required
                     />
