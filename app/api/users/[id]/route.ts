@@ -14,7 +14,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const { role } = body
+    const { role, full_name } = body
 
     if (!id) {
       return NextResponse.json({ success: false, message: 'User ID is required', error: '' }, { status: 400 })
@@ -24,7 +24,7 @@ export async function PATCH(
       return NextResponse.json({ success: false, message: 'Role is required', error: '' }, { status: 400 })
     }
 
-    const validRoles = ['Admin', 'Commandant', 'Director', 'Receptionist', 'Security', 'Host Employee', 'PA_TO_CI', 'PA_TO_DIRECTOR']
+    const validRoles = ['Admin', 'Commandant', 'Director', 'Receptionist', 'Security', 'Host Employee', 'PA_TO_CI', 'PA_TO_DIRECTOR', 'PA_TO_COMMANDER']
     if (!validRoles.includes(role)) {
       return NextResponse.json({ success: false, message: 'Invalid role', error: '' }, { status: 400 })
     }
@@ -32,7 +32,7 @@ export async function PATCH(
     // Verify the user exists
     const { data: existingUser, error: fetchError } = await supabaseAdmin
       .from('user_roles')
-      .select('id, user_id, email, role')
+      .select('id, user_id, email, role, full_name')
       .eq('user_id', id)
       .single()
 
@@ -40,10 +40,9 @@ export async function PATCH(
       return NextResponse.json({ success: false, message: 'User not found', error: '' }, { status: 404 })
     }
 
-    // Update only the badge_status... no wait, role
     const { error: updateError } = await supabaseAdmin
       .from('user_roles')
-      .update({ role })
+      .update({ role, full_name })
       .eq('user_id', id)
 
     if (updateError) {
@@ -53,10 +52,11 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      message: 'User role updated successfully',
+      message: 'User updated successfully',
       user: {
         id: existingUser.user_id,
         role,
+        full_name,
       },
     })
   } catch (err) {

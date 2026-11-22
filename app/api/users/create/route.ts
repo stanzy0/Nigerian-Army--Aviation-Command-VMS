@@ -187,6 +187,30 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (role === 'PA_TO_COMMANDER' && assigned_director_id) {
+      const { error: assignmentError } = await supabaseAdmin
+        .from('user_host_assignments')
+        .insert({
+          user_id: userId,
+          employee_id: assigned_director_id,
+        })
+
+      if (assignmentError) {
+        console.error('[USER CREATE] PA_TO_COMMANDER host assignment failed:', {
+          code: assignmentError.code,
+          message: assignmentError.message,
+          details: assignmentError.details,
+          hint: assignmentError.hint,
+        })
+        await supabaseAdmin.from('user_roles').delete().eq('user_id', userId)
+        await supabaseAdmin.auth.admin.deleteUser(userId)
+        await logAuditAction('Host Assignment Failed', 'user', userId, `Failed to assign commander for ${normalizedEmail}: ${assignmentError.message}`)
+        return NextResponse.json({ success: false, message: 'Failed to assign Commander', error: assignmentError.message }, { status: 500 })
+      } else {
+        await logAuditAction('Host Assignment Created', 'user', userId, `Assigned ${assigned_director_id} as Commander for ${normalizedEmail}`)
+      }
+    }
+
     try {
       await logAuditAction('User Created', 'user', userId, `Created user ${normalizedEmail} with ${role} role`)
     } catch (err) {
@@ -202,7 +226,7 @@ export async function POST(request: NextRequest) {
         normalized_email: normalizedEmail,
         auth_created: true,
         role_created: true,
-        host_assigned: role === 'PA_TO_CI' ? !!assigned_host_id : role === 'PA_TO_DIRECTOR' ? !!assigned_director_id : false,
+        host_assigned: role === 'PA_TO_CI' ? !!assigned_host_id : (role === 'PA_TO_DIRECTOR' || role === 'PA_TO_COMMANDER') ? !!assigned_director_id : false,
       },
     })
   } catch (err) {

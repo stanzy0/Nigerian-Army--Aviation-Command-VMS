@@ -85,3 +85,13 @@ export async function getDirectors(search?: string): Promise<Employee[]> {
   const { data } = await res.json()
   return data as Employee[]
 }
+
+export async function getCommanders(search?: string): Promise<Employee[]> {
+  const url = search ? `/api/employees/commanders?q=${encodeURIComponent(search)}` : '/api/employees/commanders'
+  const res = await fetch(url, {
+    headers: await getAuthHeaders(),
+  })
+  if (!res.ok) throw new Error('Failed to fetch Commander employees')
+  const { data } = await res.json()
+  return data as Employee[]
+}

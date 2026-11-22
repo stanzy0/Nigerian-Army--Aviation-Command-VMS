@@ -1,4 +1,4 @@
-export type UserRole = 'Admin' | 'Commandant' | 'Director' | 'Receptionist' | 'Security' | 'Host Employee' | 'PA_TO_DIRECTOR' | 'PA_TO_CI'
+export type UserRole = 'Admin' | 'Commandant' | 'Director' | 'Receptionist' | 'Security' | 'Host Employee' | 'PA_TO_DIRECTOR' | 'PA_TO_CI' | 'PA_TO_COMMANDER'
 
 export interface UserWithRole {
   id: string
@@ -107,6 +107,15 @@ export const PERMISSIONS: Record<UserRole, string[]> = {
   PA_TO_CI: [
     'dashboard',
     'visitors',
+    'visits',
+    'badges',
+    'check-in',
+    'check-out',
+    'documents',
+    'host',
+  ],
+  PA_TO_COMMANDER: [
+    'dashboard',
     'visits',
     'badges',
     'check-in',

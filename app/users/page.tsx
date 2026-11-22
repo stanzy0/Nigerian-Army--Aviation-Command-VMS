@@ -8,7 +8,7 @@ import type { UserWithRole, UserRole } from '@/lib/auth-client'
 type UserWithHostAssignment = UserWithRole & { user_id: string; host_assignment?: { employee_id: string; full_name: string | null; position: string | null; department: string | null } | null }
   import { logAuditAction } from '@/lib/client/audit'
   import { getAuthHeaders } from '@/lib/client/api'
-  import { getCiEmployees, getDirectors } from '@/lib/client/employees'
+  import { getCiEmployees, getDirectors, getCommanders } from '@/lib/client/employees'
   import type { Employee } from '@/lib/types/employee'
   import SearchableCombobox from '@/components/ui/SearchableCombobox'
   import { Search, Plus, Edit, Trash2, X, Loader2, Users } from 'lucide-react'
@@ -36,6 +36,8 @@ export default function UsersPage() {
   const [ciEmployeesLoading, setCiEmployeesLoading] = useState(false)
   const [directors, setDirectors] = useState<Employee[]>([])
   const [directorsLoading, setDirectorsLoading] = useState(false)
+  const [commanders, setCommanders] = useState<Employee[]>([])
+  const [commandersLoading, setCommandersLoading] = useState(false)
   const [hostAssignments, setHostAssignments] = useState<Record<string, { full_name: string | null; position: string | null; department: string | null }>>({})
   const realtimeChannel = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
@@ -46,6 +48,12 @@ export default function UsersPage() {
   }))
 
   const directorOptions = directors.map(emp => ({
+    value: emp.id,
+    label: emp.full_name || 'Unnamed Employee',
+    description: emp.position ? `${emp.position}${emp.department ? ' | ' + emp.department : ''}` : emp.department || undefined,
+  }))
+
+  const commanderOptions = commanders.map(emp => ({
     value: emp.id,
     label: emp.full_name || 'Unnamed Employee',
     description: emp.position ? `${emp.position}${emp.department ? ' | ' + emp.department : ''}` : emp.department || undefined,
@@ -127,8 +135,8 @@ export default function UsersPage() {
       errors.assigned_host_id = 'Please assign a CI for this PA user'
     }
 
-    if (formData.role === 'PA_TO_DIRECTOR' && !formData.assigned_director_id) {
-      errors.assigned_director_id = 'Please assign a Director for this PA user'
+    if ((formData.role === 'PA_TO_DIRECTOR' || formData.role === 'PA_TO_COMMANDER') && !formData.assigned_director_id) {
+      errors.assigned_director_id = 'Please assign a Commander for this PA user'
     }
 
     setValidationErrors(errors)
@@ -152,6 +160,7 @@ export default function UsersPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             role: formData.role,
+            full_name: formData.full_name,
           }),
         })
 
@@ -177,7 +186,7 @@ export default function UsersPage() {
             role: formData.role,
             must_change_password: mustChangePassword,
             assigned_host_id: formData.role === 'PA_TO_CI' ? formData.assigned_host_id || undefined : undefined,
-            assigned_director_id: formData.role === 'PA_TO_DIRECTOR' ? formData.assigned_director_id || undefined : undefined,
+            assigned_director_id: (formData.role === 'PA_TO_DIRECTOR' || formData.role === 'PA_TO_COMMANDER') ? formData.assigned_director_id || undefined : undefined,
           }),
         })
 
@@ -224,6 +233,9 @@ export default function UsersPage() {
     setEditingUser(user)
     fetchCiEmployees()
     fetchDirectors()
+    if (role === 'PA_TO_COMMANDER') {
+      fetchCommanders()
+    }
 
     const loadAssignment = async () => {
       try {
@@ -237,7 +249,7 @@ export default function UsersPage() {
             assigned_host_id: assignedEmployeeId,
             assigned_director_id: '',
           })
-        } else if (role === 'PA_TO_DIRECTOR') {
+        } else if (role === 'PA_TO_DIRECTOR' || role === 'PA_TO_COMMANDER') {
           setFormData({
             email: user.email,
             full_name: user.full_name || '',
@@ -305,6 +317,18 @@ export default function UsersPage() {
       console.error('Failed to fetch Director employees:', err)
     } finally {
       setDirectorsLoading(false)
+    }
+  }
+
+  async function fetchCommanders() {
+    setCommandersLoading(true)
+    try {
+      const commanderList = await getCommanders()
+      setCommanders(commanderList)
+    } catch (err) {
+      console.error('Failed to fetch Commander employees:', err)
+    } finally {
+      setCommandersLoading(false)
     }
   }
 
@@ -411,6 +435,7 @@ export default function UsersPage() {
                       <option value="Security">Security</option>
                       <option value="Host Employee">Host Employee</option>
                       <option value="PA_TO_DIRECTOR">PA to Director</option>
+                      <option value="PA_TO_COMMANDER">PA to Commander</option>
                       <option value="PA_TO_CI">PA to CI</option>
                     </select>
         </div>
@@ -462,7 +487,7 @@ export default function UsersPage() {
                            <td className="px-4 py-3 text-[#9A9F87]">{user.email}</td>
                            <td className="px-4 py-3">
                              <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                               {user.role === 'PA_TO_CI' ? 'PA to CI' : user.role === 'PA_TO_DIRECTOR' ? 'PA to Director' : user.role}
+                                {user.role === 'PA_TO_CI' ? 'PA to CI' : user.role === 'PA_TO_DIRECTOR' ? 'PA to Director' : user.role === 'PA_TO_COMMANDER' ? 'PA to Commander' : user.role}
                              </span>
                            </td>
                            <td className="px-4 py-3 text-[#9A9F87]">{hostLabel}</td>
@@ -529,7 +554,7 @@ export default function UsersPage() {
                       <div className="ml-7 text-xs text-green-700 space-y-1">
                         <p>Name: {credentials.name}</p>
                         <p>Email: {credentials.email}</p>
-                        <p>Role: {credentials.role === 'PA_TO_CI' ? 'PA to CI' : credentials.role === 'PA_TO_DIRECTOR' ? 'PA to Director' : credentials.role}</p>
+                        <p>Role: {credentials.role === 'PA_TO_CI' ? 'PA to CI' : credentials.role === 'PA_TO_DIRECTOR' ? 'PA to Director' : credentials.role === 'PA_TO_COMMANDER' ? 'PA to Commander' : credentials.role}</p>
                         {credentials.assignedHost && <p>Assigned Host: {credentials.assignedHost}</p>}
                         <div className="mt-2 pt-2 border-t border-green-200">
                           <p className="font-medium text-green-800">Temporary Password:</p>
@@ -600,6 +625,9 @@ export default function UsersPage() {
                             if (newRole === 'PA_TO_DIRECTOR' && directors.length === 0) {
                               fetchDirectors()
                             }
+                            if (newRole === 'PA_TO_COMMANDER' && commanders.length === 0) {
+                              fetchCommanders()
+                            }
                           }}
                           className={validationErrors.role ? 'border-red-300 ' + selectClasses : selectClasses}
                         >
@@ -608,12 +636,13 @@ export default function UsersPage() {
                           <option value="Security">Security</option>
                           <option value="Host Employee">Host Employee</option>
                           <option value="PA_TO_DIRECTOR">PA to Director</option>
+                          <option value="PA_TO_COMMANDER">PA to Commander</option>
                           <option value="PA_TO_CI">PA to CI</option>
                         </select>
                         {validationErrors.role && <p className="mt-1 text-xs text-red-600">{validationErrors.role}</p>}
                       </div>
 
-                      {(formData.role === 'PA_TO_CI' || formData.role === 'PA_TO_DIRECTOR') && (
+                      {(formData.role === 'PA_TO_CI' || formData.role === 'PA_TO_DIRECTOR' || formData.role === 'PA_TO_COMMANDER') && (
                         <div>
                           <h3 className="text-xs font-semibold text-[#9A9F87] uppercase tracking-wider mb-3">Host Assignment</h3>
                           {formData.role === 'PA_TO_CI' && (
@@ -633,21 +662,42 @@ export default function UsersPage() {
                               {validationErrors.assigned_host_id && <p className="mt-1 text-xs text-red-600">{validationErrors.assigned_host_id}</p>}
                             </div>
                           )}
-                          {formData.role === 'PA_TO_DIRECTOR' && (
+                          {(formData.role === 'PA_TO_DIRECTOR' || formData.role === 'PA_TO_COMMANDER') && (
                             <div>
-                              <label className="block text-sm font-medium text-[#9A9F87] mb-1">Assigned Director <span className="text-red-500">*</span></label>
-                              <SearchableCombobox
-                                options={directorOptions}
-                                value={formData.assigned_director_id}
-                                onChange={(val) => setFormData({ ...formData, assigned_director_id: val })}
-                                placeholder="Search and select a Director..."
-                                searchPlaceholder="Search Directors..."
-                                noResultsText="No Director found"
-                                loading={directorsLoading}
-                                required
-                                className="w-full"
-                              />
-                              {validationErrors.assigned_director_id && <p className="mt-1 text-xs text-red-600">{validationErrors.assigned_director_id}</p>}
+                              {formData.role === 'PA_TO_DIRECTOR' && (
+                                <div>
+                                  <label className="block text-sm font-medium text-[#9A9F87] mb-1">Assigned Director <span className="text-red-500">*</span></label>
+                                  <SearchableCombobox
+                                    options={directorOptions}
+                                    value={formData.assigned_director_id}
+                                    onChange={(val) => setFormData({ ...formData, assigned_director_id: val })}
+                                    placeholder="Search and select a Director..."
+                                    searchPlaceholder="Search Directors..."
+                                    noResultsText="No Director found"
+                                    loading={directorsLoading}
+                                    required
+                                    className="w-full"
+                                  />
+                                  {validationErrors.assigned_director_id && <p className="mt-1 text-xs text-red-600">{validationErrors.assigned_director_id}</p>}
+                                </div>
+                              )}
+                              {formData.role === 'PA_TO_COMMANDER' && (
+                                <div>
+                                  <label className="block text-sm font-medium text-[#9A9F87] mb-1">Assigned Commander <span className="text-red-500">*</span></label>
+                                  <SearchableCombobox
+                                    options={commanderOptions}
+                                    value={formData.assigned_director_id}
+                                    onChange={(val) => setFormData({ ...formData, assigned_director_id: val })}
+                                    placeholder="Search and select a Commander..."
+                                    searchPlaceholder="Search Commanders..."
+                                    noResultsText="No Commander found"
+                                    loading={commandersLoading}
+                                    required
+                                    className="w-full"
+                                  />
+                                  {validationErrors.assigned_director_id && <p className="mt-1 text-xs text-red-600">{validationErrors.assigned_director_id}</p>}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

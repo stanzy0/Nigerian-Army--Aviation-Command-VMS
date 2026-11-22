@@ -594,13 +594,13 @@ export async function updateUser(userId: string, updates: { full_name?: string; 
   }
 
   // Manage director assignment for PA_TO_DIRECTOR users
-  if (updates.role === 'PA_TO_DIRECTOR') {
+  if (updates.role === 'PA_TO_DIRECTOR' || updates.role === 'PA_TO_COMMANDER') {
     if (updates.assigned_director_id) {
       await supabaseAdmin
         .from('user_host_assignments')
         .upsert({ user_id: userId, employee_id: updates.assigned_director_id })
     }
-  } else if (updates.role && updates.role !== 'PA_TO_DIRECTOR') {
+  } else if (updates.role && updates.role !== 'PA_TO_DIRECTOR' && updates.role !== 'PA_TO_COMMANDER') {
     await supabaseAdmin
       .from('user_host_assignments')
       .delete()
