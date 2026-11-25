@@ -54,6 +54,7 @@ export default function Step4VisitInfo({ host_employee_id = '', purpose = '', cu
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loadingEmployees, setLoadingEmployees] = useState(true)
   const [userRole, setUserRole] = useState<UserRole | null>(null)
+  const [employeeError, setEmployeeError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -62,12 +63,25 @@ export default function Step4VisitInfo({ host_employee_id = '', purpose = '', cu
         if (res.ok) {
           const result = await res.json()
           setEmployees(result.data ?? [])
+          setEmployeeError(null)
+        } else if (res.status === 401) {
+          // Authentication/permission error
+          setEmployeeError('You do not have permission to view employees. Please contact your administrator.')
+          setEmployees([])
+        } else if (res.status >= 500) {
+          // Server error
+          setEmployeeError('Failed to load employees. Please try again later.')
+          setEmployees([])
         } else {
-          console.error('Failed to load employees:', await res.text())
+          // Other client errors
+          const errorText = await res.text()
+          console.error('Failed to load employees:', errorText)
+          setEmployeeError('Failed to load employees. Please try again.')
           setEmployees([])
         }
       } catch (err) {
         console.error('Failed to load employees:', err)
+        setEmployeeError('Failed to load employees. Please check your connection.')
         setEmployees([])
       } finally {
         setLoadingEmployees(false)
@@ -90,6 +104,7 @@ export default function Step4VisitInfo({ host_employee_id = '', purpose = '', cu
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Host Employee *</label>
+          {employeeError && <p className="text-sm text-red-600 mt-1 mb-2">{employeeError}</p>}
           <SearchableCombobox
             options={employees.map((emp) => ({
               value: emp.id,

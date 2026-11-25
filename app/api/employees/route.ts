@@ -18,7 +18,10 @@ export async function GET(request: NextRequest) {
   }
   try {
     const user = await getCurrentUser()
-    if (!user || !user.role || !PERMISSIONS[user.role]?.includes('employees')) {
+
+    // Allow both Admin and Receptionist to read employees
+    const allowedRoles = ['Admin', 'Receptionist']
+    if (!user || !user.role || !['Admin', 'Receptionist'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Authentication required', error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -31,7 +34,8 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('employees')
-      .select('*')
+      // Select only fields needed for the Host Employee dropdown
+      .select('id, full_name, department, position, office_location')
       .order('created_at', { ascending: false })
 
     if (search) {
@@ -53,7 +57,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
-    if (!user || !user.role || !PERMISSIONS[user.role]?.includes('employees')) {
+    // Only Admin can create employees
+    if (!user || user.role !== 'Admin') {
       return NextResponse.json({ success: false, message: 'Authentication required', error: 'Unauthorized' }, { status: 401 })
     }
 
