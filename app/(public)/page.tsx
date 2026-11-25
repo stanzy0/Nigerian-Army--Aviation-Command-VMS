@@ -13,6 +13,7 @@ import {
   Activity,
   LayoutDashboard,
 } from 'lucide-react'
+import { BirthdayCelebration } from '@/components/birthday/BirthdayCelebration'
 
 const FEATURES = [
   {
@@ -192,6 +193,10 @@ Nigerian Army Aviation Command
             </svg>
           </div>
         </section>
+
+        <BirthdayCelebration />
+
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-[rgba(85,107,47,0.3)] to-transparent" aria-hidden="true" />
 
         <section id="features" className="py-16 bg-[#141A10]">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

@@ -26,7 +26,13 @@ export const createClient = async () => {
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          cookieStore.set(name, value, options)
+          // Strip domain so the session cookie is scoped to the current host
+          // (localhost:3000) and is sent back to /api/auth/me. If @supabase/ssr
+          // sets domain to the Supabase host, the browser would not send the
+          // cookie to the Next.js app, causing /api/auth/me to return 401 and
+          // producing a login redirect loop.
+          const { domain, ...cookieOptions } = options
+          cookieStore.set(name, value, cookieOptions)
         })
       },
     },

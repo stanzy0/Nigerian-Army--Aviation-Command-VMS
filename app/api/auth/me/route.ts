@@ -27,8 +27,11 @@ export async function GET(request: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
+      console.error('[api/auth/me] getUser failed:', authError?.message ?? 'no user returned')
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
+
+    console.info('[api/auth/me] getUser succeeded for user:', user.id)
 
     if (!supabaseAdmin) {
       return NextResponse.json(

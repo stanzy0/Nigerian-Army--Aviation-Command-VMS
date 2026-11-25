@@ -1,5 +1,6 @@
 import type { Employee, EmployeeFormData, Department, Position, OfficeLocation } from '@/lib/types/employee'
 import { getAuthHeaders } from '@/lib/client/api'
+import { isDemoMode } from '@/lib/demo'
 
 export async function getEmployees(): Promise<Employee[]> {
   const res = await fetch('/api/employees', {
@@ -94,4 +95,34 @@ export async function getCommanders(search?: string): Promise<Employee[]> {
   if (!res.ok) throw new Error('Failed to fetch Commander employees')
   const { data } = await res.json()
   return data as Employee[]
+}
+
+export async function uploadEmployeePhoto(id: string, file: File): Promise<string> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const headers = new Headers()
+
+  if (!isDemoMode()) {
+    const { supabase } = await import('@/lib/supabase')
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (session?.access_token) {
+      headers.set('Authorization', `Bearer ${session.access_token}`)
+    }
+  }
+
+  const res = await fetch(`/api/employees/${id}/photo`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err.error || 'Failed to upload photo')
+  }
+  const { data } = await res.json()
+  return data.url as string
 }

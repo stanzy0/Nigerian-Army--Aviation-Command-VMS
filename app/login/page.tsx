@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { isDemoMode } from '@/lib/demo'
-import { createClient } from '@/lib/supabase/client'
 import { logAuditAction } from '@/lib/client/audit'
 import ImageWithFallback from '@/components/ui/ImageWithFallback'
 import Link from 'next/link'
@@ -34,9 +33,15 @@ export default function LoginPage() {
     const checkRememberedDevice = async () => {
       if (isDemoMode()) return
       try {
-        const user = await createClient().auth.getUser()
-        if (user.data.user) {
-          window.location.href = '/dashboard'
+        const res = await fetch('/api/auth/me', {
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        if (res.ok) {
+          const { data } = await res.json()
+          if (data?.data?.id) {
+            window.location.href = '/dashboard'
+          }
         }
       } catch {
         // Network/auth unavailable — allow login page to render normally
@@ -107,68 +112,46 @@ export default function LoginPage() {
     }
 
     try {
-      const supabase = createClient()
-      const normalizedEmail = email.trim().toLowerCase()
-      const loginPassword = password.trim()
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password: loginPassword,
+      // Clear any stale cross-tab logout flag from a previous session before
+      // starting a fresh login attempt, so it cannot interfere with the new
+      // authenticated session once the dashboard loads.
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.removeItem('naac_vms_logout_requested')
+        } catch {
+          // localStorage unavailable; ignore gracefully
+        }
+      }
+
+      const formData = new FormData()
+      formData.set('email', email)
+      formData.set('password', password)
+      formData.set('remember', rememberDevice ? 'on' : 'off')
+
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
       })
 
-      if (authError || !data.user) {
-        setFailedAttempts(prev => prev + 1)
-        if (failedAttempts + 1 >= MAX_FAILED_ATTEMPTS) {
-          setError('Account locked due to too many failed attempts.')
-        } else {
-          setError('Invalid email or password. Please check your credentials and try again.')
+      // The API returns a JSON response on success - check if it has redirectUrl
+      if (res.ok) {
+        const result = await res.json()
+        if (result.redirectUrl) {
+          console.info('[handleLogin] login successful, redirecting to:', result.redirectUrl)
+          window.location.href = result.redirectUrl
+          return
         }
-        await logAuditAction('Failed Login', 'auth', null, `Failed login attempt for ${email}`)
-        setLoading(false)
-        return
       }
 
-      if (rememberDevice) {
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        document.cookie = `remember_device=true; expires=${expiresAt.toUTCString()}; path=/; SameSite=Lax`
+      // If not redirected, parse error response
+      const result = await res.json()
+    } catch (err: unknown) {
+      // Re-throw NEXT_REDIRECT so Next.js can handle the redirect properly
+      if (err && typeof err === 'object' && 'digest' in err && err.digest === 'NEXT_REDIRECT') {
+        throw err
       }
-
-      await logAuditAction('Login', 'auth', data.user.id, `User ${email} logged in`)
-
-      if (data.user.user_metadata?.must_change_password) {
-        window.location.href = '/change-password'
-        return
-      }
-
-      const roleRes = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' })
-      const roleData = roleRes.ok ? await roleRes.json() : { success: false }
-      if (!roleRes.ok) {
-        setError('Unable to verify your session. Please try again.')
-        setLoading(false)
-        return
-      }
-      if (!roleData.success) {
-        setError('Unable to verify your account. Please contact support.')
-        setLoading(false)
-        return
-      }
-      const role = roleData.data?.role
-      if (roleData.data?.missingRole) {
-        setError('Your account does not have an assigned role. Please contact an administrator.')
-        setLoading(false)
-        return
-      }
-      if (role === 'PA_TO_CI') {
-        window.location.href = '/pa-ci'
-      } else if (role === 'PA_TO_DIRECTOR') {
-        window.location.href = '/pa-director'
-      } else if (role === 'Security') {
-        window.location.href = '/security'
-      } else if (role === 'Host Employee') {
-        window.location.href = '/host'
-      } else {
-        window.location.href = '/dashboard'
-      }
-    } catch {
+      console.error('[handleLogin] Unexpected error:', err)
       setError('An unexpected error occurred. Please try again.')
       setLoading(false)
     }

@@ -66,6 +66,18 @@ export async function PUT(
       office_location: body.office_location || null,
     }
 
+    if (body.date_of_birth !== undefined) {
+      updateData.date_of_birth = body.date_of_birth || null
+    }
+
+    if (body.birthday_public !== undefined) {
+      updateData.birthday_public = body.birthday_public === true
+    }
+
+    if (body.photo_url !== undefined) {
+      updateData.photo_url = body.photo_url || null
+    }
+
     if (body.department_id) {
       const { data: dept } = await supabaseAdmin
         .from('departments')

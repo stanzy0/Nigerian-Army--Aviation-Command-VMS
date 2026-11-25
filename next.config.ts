@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
         hostname: "phkmhrncmkvfgnraiyug.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      {
+        protocol: "https",
+        hostname: "rbdgjkwmjizptlqucfjv.supabase.co",
+        pathname: "/storage/v1/object/public/employee-photos/**",
+      },
     ],
   },
   async headers() {

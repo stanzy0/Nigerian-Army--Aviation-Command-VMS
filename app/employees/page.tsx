@@ -6,7 +6,7 @@ import { logAuditAction } from '@/lib/client/audit'
 import { Search, Plus, Edit, Trash2, X, Loader2 } from 'lucide-react'
 import type { Employee, EmployeeFormData, Department, Position, OfficeLocation } from '@/lib/types/employee'
 import { getCurrentUser, PERMISSIONS } from '@/lib/auth-client'
-import { getEmployees, createEmployee, updateEmployee, deleteEmployee, getLookups } from '@/lib/client/employees'
+import { getEmployees, createEmployee, updateEmployee, deleteEmployee, getLookups, uploadEmployeePhoto } from '@/lib/client/employees'
 import SearchableCombobox from '@/components/ui/SearchableCombobox'
 
 const initialFormData: EmployeeFormData & { department_id?: string | null; position_id?: string | null; office_location_id?: string | null } = {
@@ -16,6 +16,8 @@ const initialFormData: EmployeeFormData & { department_id?: string | null; posit
   department: '',
   position: '',
   office_location: '',
+  date_of_birth: null,
+  birthday_public: false,
   department_id: null,
   position_id: null,
   office_location_id: null,
@@ -38,6 +40,9 @@ export default function EmployeesPage() {
   const [positions, setPositions] = useState<Position[]>([])
   const [officeLocations, setOfficeLocations] = useState<OfficeLocation[]>([])
   const [loadingLookups, setLoadingLookups] = useState(true)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
   const realtimeChannel = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const showNotification = (type: 'success' | 'error', message: string) => {
@@ -118,6 +123,7 @@ export default function EmployeesPage() {
       if (realtimeChannel.current) {
         supabase.removeChannel(realtimeChannel.current)
       }
+      if (photoPreview) URL.revokeObjectURL(photoPreview)
     }
   }, [])
 
@@ -125,34 +131,42 @@ export default function EmployeesPage() {
     e.preventDefault()
     setSubmitting(true)
 
-    const payload = {
-      ...formData,
-    }
+    try {
+      let photoUrl = formData.photo_url || null
 
-    if (editingEmployee) {
-      try {
-        await updateEmployee(editingEmployee.id, payload)
+      if (editingEmployee) {
+        if (photoFile) {
+          setPhotoUploading(true)
+          photoUrl = await uploadEmployeePhoto(editingEmployee.id, photoFile)
+          setPhotoUploading(false)
+        }
+        await updateEmployee(editingEmployee.id, { ...formData, photo_url: photoUrl })
         logAuditAction('Employee Updated', 'employee', editingEmployee.id, `${formData.full_name} updated - ${formData.position} in ${formData.department}`)
         showNotification('success', 'Employee updated successfully')
-        fetchEmployees()
-      } catch (err) {
-        showNotification('error', err instanceof Error ? err.message : 'Failed to update employee')
-      }
-    } else {
-      try {
-        const newEmployee = await createEmployee(payload)
+      } else {
+        const newEmployee = await createEmployee({ ...formData, photo_url: null })
+        if (photoFile) {
+          setPhotoUploading(true)
+          photoUrl = await uploadEmployeePhoto(newEmployee.id, photoFile)
+          setPhotoUploading(false)
+          await updateEmployee(newEmployee.id, { photo_url: photoUrl })
+        }
         logAuditAction('Employee Created', 'employee', newEmployee.id, `${formData.full_name} added - ${formData.position} in ${formData.department}`)
         showNotification('success', 'Employee added successfully')
-        fetchEmployees()
-      } catch (err) {
-        showNotification('error', err instanceof Error ? err.message : 'Failed to create employee')
       }
+
+      fetchEmployees()
+    } catch (err) {
+      showNotification('error', err instanceof Error ? err.message : 'Failed to save employee')
     }
 
     setSubmitting(false)
     setModalOpen(false)
     setEditingEmployee(null)
     setFormData(initialFormData)
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setPhotoUploading(false)
   }
 
   const handleEdit = (employee: Employee) => {
@@ -164,7 +178,12 @@ export default function EmployeesPage() {
       department: employee.department,
       position: employee.position,
       office_location: employee.office_location,
+      date_of_birth: employee.date_of_birth || null,
+      birthday_public: employee.birthday_public === true,
+      photo_url: employee.photo_url || null,
     })
+    setPhotoFile(null)
+    setPhotoPreview(employee.photo_url || null)
     setModalOpen(true)
   }
 
@@ -193,6 +212,8 @@ export default function EmployeesPage() {
   const openAddModal = () => {
     setEditingEmployee(null)
     setFormData(initialFormData)
+    setPhotoFile(null)
+    setPhotoPreview(null)
     setModalOpen(true)
   }
 
@@ -223,6 +244,19 @@ export default function EmployeesPage() {
       office_location_id: locId,
       office_location: loc?.display_name || loc?.name || '',
     }))
+  }
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    if (!file) {
+      setPhotoFile(null)
+      if (photoPreview) URL.revokeObjectURL(photoPreview)
+      setPhotoPreview(null)
+      return
+    }
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhotoFile(file)
+    setPhotoPreview(URL.createObjectURL(file))
   }
 
   const filteredOfficeLocations = officeLocations
@@ -445,6 +479,69 @@ export default function EmployeesPage() {
                       loading={loadingLookups}
                       required
                     />
+                  </div>
+                  <div>
+                    <label htmlFor="date_of_birth" className="block text-sm font-medium text-[#9A9F87] mb-1">
+                      Date of Birth
+                    </label>
+                    <input
+                      id="date_of_birth"
+                      type="date"
+                      value={formData.date_of_birth || ''}
+                      onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value || null })}
+                      placeholder="Select date of birth"
+                      className={inputClasses}
+                    />
+                    <p className="text-[10px] text-[#9A9F87] mt-1">Optional. Used for birthday celebration display.</p>
+                  </div>
+                  <div>
+                    <label htmlFor="photo_upload" className="block text-sm font-medium text-[#9A9F87] mb-1">
+                      Employee Photograph
+                    </label>
+                    <input
+                      id="photo_upload"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handlePhotoChange}
+                      className="mt-1 block w-full text-sm text-[#9A9F87] file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#4B5320]/20 file:text-[#C8A646] hover:file:bg-[#4B5320]/40"
+                    />
+                    {photoUploading && (
+                      <p className="text-[10px] text-[#C8A646] mt-1">Uploading photograph...</p>
+                    )}
+                    {!photoUploading && photoPreview && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <img
+                          src={photoPreview}
+                          alt="Photo preview"
+                          className="w-20 h-20 rounded-full object-cover border-2 border-[#C8A646]/30"
+                        />
+                        <span className="text-xs text-[#9A9F87]">Photo selected</span>
+                      </div>
+                    )}
+                    {!photoUploading && !photoPreview && formData.photo_url && (
+                      <div className="mt-3 flex items-center gap-3">
+                        <img
+                          src={formData.photo_url}
+                          alt="Current photograph"
+                          className="w-20 h-20 rounded-full object-cover border-2 border-[#C8A646]/30"
+                        />
+                        <span className="text-xs text-[#9A9F87]">Current photograph</span>
+                      </div>
+                    )}
+                    <p className="text-[10px] text-[#9A9F87] mt-1">Accepted formats: JPG, JPEG, PNG, WebP. Maximum size: 5 MB.</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <input
+                      id="birthday_public"
+                      type="checkbox"
+                      checked={formData.birthday_public === true}
+                      onChange={(e) => setFormData({ ...formData, birthday_public: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-300 bg-[#10150D] text-[#C8A646] focus:ring-blue-500"
+                    />
+                    <label htmlFor="birthday_public" className="text-sm font-medium text-[#9A9F87] leading-6">
+                      Allow birthday to be shown on public display
+                    </label>
+                    <p className="text-[10px] text-[#9A9F87] mt-1">Only name and department will be displayed — never date of birth or age.</p>
                   </div>
                 </div>
                 <div className="flex-shrink-0 flex justify-end gap-3 p-4 border-t border-[rgba(85,107,47,0.35)]">

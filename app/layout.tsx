@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BrandingProvider from "@/components/BrandingProvider";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { SessionTimeoutProvider } from "@/components/auth/SessionTimeoutProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,7 +33,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col w-full">
         <BrandingProvider>
           <NotificationProvider>
-            {children}
+            <SessionTimeoutProvider>
+              {children}
+            </SessionTimeoutProvider>
           </NotificationProvider>
         </BrandingProvider>
       </body>

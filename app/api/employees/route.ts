@@ -74,6 +74,9 @@ export async function POST(request: NextRequest) {
       department: body.department || null,
       position: body.position || null,
       office_location: body.office_location || null,
+      date_of_birth: body.date_of_birth || null,
+      birthday_public: body.birthday_public === true,
+      photo_url: body.photo_url || null,
     }
 
     if (body.department_id) {

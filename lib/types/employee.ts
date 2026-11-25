@@ -30,6 +30,9 @@ export interface Employee {
   office_location: string
   user_id?: string | null
   created_at: string
+  date_of_birth?: string | null
+  birthday_public?: boolean
+  photo_url?: string | null
 }
 
 export interface EmployeeFormData {
@@ -39,4 +42,10 @@ export interface EmployeeFormData {
   department: string
   position: string
   office_location: string
+  date_of_birth?: string | null
+  birthday_public?: boolean
+  photo_url?: string | null
+  department_id?: string | null
+  position_id?: string | null
+  office_location_id?: string | null
 }
