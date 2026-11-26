@@ -1,9 +1,10 @@
-'use client'
+ 'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getCurrentUser, PERMISSIONS } from '@/lib/auth-client'
+import { detailsToText, detailsToRole, formatDetailsDisplay } from '@/lib/audit/details'
 
 interface AuditLog {
   id: string
@@ -11,22 +12,8 @@ interface AuditLog {
   entity_type: string
   entity_id: string | null
   performed_by: string
-  details: string | { message?: string; role?: string; [key: string]: unknown } | null
+  details: unknown
   created_at: string
-}
-
-function getDetailsMessage(details: AuditLog['details']): string {
-  if (!details) return ''
-  if (typeof details === 'string') return details
-  return details.message || ''
-}
-
-function getDetailsRole(details: AuditLog['details']): string {
-  if (!details) return '—'
-  if (typeof details === 'string') {
-    return details.match(/role\s+(\w+)/)?.[1] || '—'
-  }
-  return details.role || '—'
 }
 
 interface AuditLogsResponse {
@@ -39,10 +26,6 @@ interface AuditLogsResponse {
     totalPages: number
   }
 }
-
-const EVENT_TYPES = ['login_success', 'logout', 'login_failed', 'login_failed_invalid_credentials', 'login_failed_account_locked', 'Other']
-const AUTH_EVENT_TYPES = ['login_success', 'logout', 'login_failed', 'login_failed_invalid_credentials', 'login_failed_account_locked']
-const USER_ROLES = ['Admin', 'Receptionist', 'Security', 'Commandant', 'Director', 'Host Employee', 'PA_TO_DIRECTOR', 'PA_TO_CI', 'PA_TO_COMMANDER']
 
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([])
@@ -66,8 +49,10 @@ export default function AuditLogsPage() {
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalRecords, setTotalRecords] = useState(0)
-  const [currentRole, setCurrentRole] = useState<string | null>(null)
   const realtimeChannel = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  const EVENT_TYPES = ['login_success', 'logout', 'login_failed', 'login_failed_invalid_credentials', 'login_failed_account_locked', 'Other']
+  const USER_ROLES = ['Admin', 'Receptionist', 'Security', 'Commandant', 'Director', 'Host Employee', 'PA_TO_DIRECTOR', 'PA_TO_CI', 'PA_TO_COMMANDER']
 
   const fetchLogs = async () => {
     setLoading(true)
@@ -88,7 +73,7 @@ export default function AuditLogsPage() {
       })
 
       if (res.ok) {
-        const result: AuditLogsResponse = await res.json()
+        const result = await res.json()
         if (result.success) {
           setLogs(result.data || [])
           setTotalPages(result.pagination?.totalPages || 1)
@@ -136,7 +121,6 @@ export default function AuditLogsPage() {
         window.location.href = '/unauthorized'
         return
       }
-      setCurrentRole(user.role)
       setAuthChecking(false)
       fetchLogs()
       setupRealtime()
@@ -148,14 +132,12 @@ export default function AuditLogsPage() {
         supabase.removeChannel(realtimeChannel.current)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     if (!authChecking) {
       setTimeout(() => fetchLogs(), 0)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFilter, eventTypeFilter, userRoleFilter, page])
 
   if (authChecking) {
@@ -180,7 +162,7 @@ export default function AuditLogsPage() {
       log.entity_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (log.entity_id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.performed_by.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getDetailsMessage(log.details).toLowerCase().includes(searchTerm.toLowerCase())
+      detailsToText(log.details).toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const handlePageChange = (newPage: number) => {
@@ -227,7 +209,7 @@ export default function AuditLogsPage() {
                 className="rounded-lg border border-gray-300 px-3 py-2"
               >
                 <option value="">All Event Types</option>
-                {(currentRole === 'Receptionist' ? AUTH_EVENT_TYPES : EVENT_TYPES).map((type) => (
+                {EVENT_TYPES.map((type) => (
                   <option key={type} value={type}>
                     {type}
                   </option>
@@ -295,13 +277,13 @@ export default function AuditLogsPage() {
                         <td className="px-4 py-3 text-[#9A9F87]">{log.performed_by}</td>
                         <td className="px-4 py-3 text-[#9A9F87]">
                           <span className="text-xs bg-[#4B5320]/20 px-2 py-1 rounded">
-                            {getDetailsRole(log.details)}
+                            {detailsToRole(log.details)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-[#9A9F87] whitespace-nowrap">
                           {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
                         </td>
-                        <td className="px-4 py-3 text-[#9A9F87]">{getDetailsMessage(log.details) || '—'}</td>
+                        <td className="px-4 py-3 text-[#9A9F87]">{formatDetailsDisplay(log.details)}</td>
                       </tr>
                     ))}
                   </tbody>
