@@ -33,9 +33,10 @@ vi.mock('@/lib/supabase-admin', () => ({
   },
 }));
 
-vi.mock('@/lib/server/integration-auth', () => ({
-  authenticateApiKey: mockAuthenticateApiKey,
-}));
+vi.mock('@/lib/server/integration-auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/server/integration-auth')>();
+  return { ...actual, authenticateApiKey: mockAuthenticateApiKey };
+});
 
 vi.mock('@/lib/server/integration-rate-limit', () => ({
   checkRateLimit: mockCheckRateLimit,

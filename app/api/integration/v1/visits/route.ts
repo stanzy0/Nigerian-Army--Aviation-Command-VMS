@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { authenticateApiKey } from '@/lib/server/integration-auth';
+import { authenticateApiKey, extractBearerToken } from '@/lib/server/integration-auth';
 import { checkRateLimit } from '@/lib/server/integration-rate-limit';
 import { logApiAccess } from '@/lib/server/integration-audit';
+import { parsePagination } from '@/lib/server/integration-pagination';
 import {
   integrationErrorResponse,
   integrationSuccessResponse,
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   // 1. Authenticate via bearer token
   authResult = await authenticateApiKey(
-    request.headers.get('authorization')?.replace('Bearer ', '') || '',
+    extractBearerToken(request.headers.get('authorization')),
     'visits:read'
   );
   integrationId = authResult.integrationId;
@@ -65,8 +66,23 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-  const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '20', 10)), 100);
+  const pagination = parsePagination(searchParams);
+  if (!pagination.ok) {
+    await logApiAccess({
+      integrationKeyId: integrationId,
+      integrationName,
+      endpoint,
+      method,
+      statusCode: 400,
+      outcome: 'client_error',
+      requestId: request.headers.get('x-request-id') || null,
+      responseTimeMs: Date.now() - startTime,
+      resultCount: null,
+    });
+
+    return integrationErrorResponse('INVALID_PARAMETER', pagination.error, 400);
+  }
+  const { page, limit } = pagination;
   const statusParam = searchParams.get('status') || undefined;
   const visitorId = searchParams.get('visitor_id') || undefined;
   const visitDate = searchParams.get('visit_date') || undefined;
@@ -121,6 +137,43 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Resolve matching visitor ids for name/phone search.
+    // Filtering on an embedded resource column (visitor.full_name / visitor.phone)
+    // is unreliable in PostgREST, so matching visitor ids are resolved from the
+    // visitors table first and the visits query is constrained with
+    // .in('visitor_id', ids). This keeps pagination and exact counts accurate and
+    // never exposes additional visitor fields (only ids are used internally).
+    let visitorIds: string[] | null = null;
+    if (search || phone) {
+      let visitorQuery = supabaseAdmin.from('visitors').select('id');
+      if (search) {
+        visitorQuery = visitorQuery.ilike('full_name', `%${search}%`);
+      }
+      if (phone) {
+        visitorQuery = visitorQuery.ilike('phone', `%${phone}%`);
+      }
+
+      const { data: matchedVisitors, error: matchError } = await visitorQuery;
+      if (matchError) {
+        console.error('[GET /api/integration/v1/visits] visitor lookup error:', matchError.message);
+        await logApiAccess({
+          integrationKeyId: integrationId,
+          integrationName,
+          endpoint,
+          method,
+          statusCode: 500,
+          outcome: 'server_error',
+          requestId: request.headers.get('x-request-id') || null,
+          responseTimeMs: Date.now() - startTime,
+          resultCount: null,
+        });
+
+        return integrationErrorResponse('INTERNAL_ERROR', 'Failed to fetch visits', 500);
+      }
+
+      visitorIds = (matchedVisitors || []).map((row: { id: string }) => row.id);
+    }
+
     // Query visits with explicit field selection - no sensitive fields
     // We do NOT select: notes, photo_url, nationality, gender, emergency_contact,
     // doc_number, doc_front_url, doc_back_url, qr_token, qr_code,
@@ -149,12 +202,28 @@ export async function GET(request: NextRequest) {
       query = query.lte('scheduled_date', endDate.toISOString());
     }
 
-    if (search) {
-      query = query.ilike('visitor.full_name', `%${search}%`);
-    }
+    if (visitorIds !== null) {
+      if (visitorIds.length === 0) {
+        // No visitors matched the search/phone filter - return an accurate empty page.
+        await logApiAccess({
+          integrationKeyId: integrationId,
+          integrationName,
+          endpoint,
+          method,
+          statusCode: 200,
+          outcome: 'success',
+          requestId: request.headers.get('x-request-id') || null,
+          responseTimeMs: Date.now() - startTime,
+          resultCount: 0,
+        });
 
-    if (phone) {
-      query = query.ilike('visitor.phone', `%${phone}%`);
+        return integrationSuccessResponse(
+          [],
+          { page, limit, total: 0, total_pages: 0 },
+          { limit: rateLimit.limit, remaining: rateLimit.remaining, resetTime: rateLimit.resetTime }
+        );
+      }
+      query = query.in('visitor_id', visitorIds);
     }
 
     const { data, error, count } = await query.range((page - 1) * limit, page * limit - 1);

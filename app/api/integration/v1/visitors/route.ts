@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { authenticateApiKey } from '@/lib/server/integration-auth';
+import { authenticateApiKey, extractBearerToken } from '@/lib/server/integration-auth';
 import { checkRateLimit } from '@/lib/server/integration-rate-limit';
 import { logApiAccess } from '@/lib/server/integration-audit';
+import { parsePagination } from '@/lib/server/integration-pagination';
 import {
   integrationErrorResponse,
   integrationSuccessResponse,
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   // 1. Authenticate via bearer token
   authResult = await authenticateApiKey(
-    request.headers.get('authorization')?.replace('Bearer ', '') || '',
+    extractBearerToken(request.headers.get('authorization')),
     'visitors:read'
   );
   integrationId = authResult.integrationId;
@@ -88,8 +89,23 @@ export async function GET(request: NextRequest) {
 
   // 3. Parse and validate query parameters
   const { searchParams } = new URL(request.url);
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-  const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '20', 10)), 100);
+  const pagination = parsePagination(searchParams);
+  if (!pagination.ok) {
+    await logApiAccess({
+      integrationKeyId: integrationId,
+      integrationName,
+      endpoint,
+      method,
+      statusCode: 400,
+      outcome: 'client_error',
+      requestId: request.headers.get('x-request-id') || null,
+      responseTimeMs: Date.now() - startTime,
+      resultCount: null,
+    });
+
+    return integrationErrorResponse('INVALID_PARAMETER', pagination.error, 400);
+  }
+  const { page, limit } = pagination;
   const search = searchParams.get('search') || undefined;
   const phone = searchParams.get('phone') || undefined;
   const from = searchParams.get('from') || undefined;

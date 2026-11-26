@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { authenticateApiKey } from '@/lib/server/integration-auth';
+import { authenticateApiKey, extractBearerToken } from '@/lib/server/integration-auth';
 import { checkRateLimit } from '@/lib/server/integration-rate-limit';
 import { logApiAccess } from '@/lib/server/integration-audit';
+import { parsePagination } from '@/lib/server/integration-pagination';
 import {
   integrationErrorResponse,
   integrationSuccessResponse,
@@ -36,7 +37,7 @@ export async function GET(
 
   // 1. Authenticate via bearer token
   authResult = await authenticateApiKey(
-    request.headers.get('authorization')?.replace('Bearer ', '') || '',
+    extractBearerToken(request.headers.get('authorization')),
     'visitors:read'
   );
   integrationId = authResult.integrationId;
@@ -81,7 +82,29 @@ export async function GET(
     return integrationRateLimitResponse(rateLimit.resetTime, rateLimit.limit, rateLimit.currentCount);
   }
 
-  // 3. Validate visitor ID (UUID format)
+  // 3. Validate pagination parameters if supplied.
+  // This endpoint returns a single resource and does not paginate, but any
+  // explicitly supplied page/limit values are still validated so malformed
+  // input is rejected consistently with the collection endpoints. Valid values
+  // are accepted and ignored.
+  const pagination = parsePagination(new URL(request.url).searchParams);
+  if (!pagination.ok) {
+    await logApiAccess({
+      integrationKeyId: integrationId,
+      integrationName,
+      endpoint,
+      method,
+      statusCode: 400,
+      outcome: 'client_error',
+      requestId: request.headers.get('x-request-id') || null,
+      responseTimeMs: Date.now() - startTime,
+      resultCount: null,
+    });
+
+    return integrationErrorResponse('INVALID_PARAMETER', pagination.error, 400);
+  }
+
+  // 4. Validate visitor ID (UUID format)
   const { id } = await params;
   if (!id || !isValidUuid(id)) {
     await logApiAccess({

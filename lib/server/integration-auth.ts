@@ -26,6 +26,23 @@ interface TokenValidationResult {
 }
 
 /**
+ * Extracts the raw token from an Authorization header value.
+ *
+ * The Bearer scheme is matched case-insensitively (per RFC 7235) and tolerates
+ * arbitrary leading/trailing whitespace between the scheme and the token.
+ * Returns null when the header is absent or does not use the Bearer scheme.
+ *
+ * This does NOT validate the token; it only performs scheme parsing.
+ *
+ * @param header - The raw `Authorization` header value (or null).
+ */
+export function extractBearerToken(header: string | null): string | null {
+  if (!header) return null;
+  const match = /^Bearer\s+(\S.*)$/i.exec(header.trim());
+  return match ? match[1].trim() : null;
+}
+
+/**
  * Authenticates an API integration request by validating the Bearer token
  * against the api_integration_keys table.
  *
@@ -141,6 +158,18 @@ export async function authenticateApiKey(
       status: 403,
     };
   }
+
+  // Best-effort telemetry: record last successful use. This is fire-and-forget
+  // and must never block the request or turn a valid request into a failure if
+  // the update fails. Only the key id is used; the plaintext token is never stored.
+  void supabaseAdmin
+    .from('api_integration_keys')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', keyRow.id)
+    .then(
+      () => undefined,
+      () => undefined
+    );
 
   return {
     authorized: true,
