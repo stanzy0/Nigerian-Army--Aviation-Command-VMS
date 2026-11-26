@@ -52,7 +52,7 @@ curl -H "Authorization: Bearer naac_live_..." \
 
 All error responses include `Cache-Control: no-store`.
 
-The API token is supplied by the NAAC VMS administrator through an approved secure channel. Do not share or expose the token.
+The API token is supplied by the NA AVN VMS administrator through an approved secure channel. Do not share or expose the token.
 
 ---
 
@@ -452,7 +452,7 @@ visitors = client.visitors(page=1, limit=20)
 
 ### Issuing Tokens
 
-Tokens are issued by the NAAC VMS administrator. Use the provided script:
+Tokens are issued by the NA AVN VMS administrator. Use the provided script:
 
 ```bash
 npx tsx scripts/issue-api-token.mts \
@@ -503,4 +503,4 @@ npx tsx scripts/revoke-api-token.mts --name "NAAC Command Control System"
 
 ## Support
 
-For support, contact the NAAC VMS administrator through approved channels.
+For support, contact the NA AVN VMS administrator through approved channels.

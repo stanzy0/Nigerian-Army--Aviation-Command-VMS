@@ -1,4 +1,4 @@
-# NA Avn Comd - Supabase Migrations
+# NA AVN VMS - Supabase Migrations
 
 ## Files
 - `20251024_init_naavc.sql` - Initial schema (employees, visitors, visits, roles, notifications, audit logs)

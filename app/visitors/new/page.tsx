@@ -72,7 +72,7 @@ export default function NewVisitorPage() {
       <div className="absolute inset-0 z-0">
           <img
             src="/images/naac-login.jpg"
-            alt="NA Avn Comd login background"
+            alt="NA AVN login background"
             className="w-full h-full object-cover"
           />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F08]/90 via-[#0B0F08]/70 to-[#0B0F08]/40" />
@@ -91,7 +91,7 @@ export default function NewVisitorPage() {
           <div className="flex items-center justify-between mb-6">
             <ImageWithFallback
               src="/images/afcsc-logo.png"
-              alt="NA Avn Comd Logo"
+              alt="NA AVN Logo"
               className="h-16 w-16 object-contain"
             />
             <h1 className="text-xl font-bold text-[#F5F5DC]">Visitor Registration</h1>

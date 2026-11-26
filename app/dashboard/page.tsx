@@ -46,6 +46,7 @@ import { SkeletonCard, SkeletonChart, SkeletonActivity } from '@/components/ui/S
 import SecurityPanel from '@/components/dashboard/SecurityPanel'
 import ChartCard from '@/components/dashboard/ChartCard'
 import { useDashboardData, DashboardFilters } from '@/hooks/useDashboardData'
+import { formatActivityDetails } from '@/lib/dashboard/format'
 import {
   BarChart,
   Bar,
@@ -563,7 +564,7 @@ export default function DashboardPage() {
     id: a.id,
     time: new Date(a.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     title: a.action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    description: a.details,
+    description: formatActivityDetails(a.details),
     type: a.action.includes('checkin') ? 'checkin' as const : a.action.includes('checkout') ? 'checkout' as const : a.action.includes('approve') ? 'approval' as const : a.action.includes('badge') ? 'badge' as const : a.action.includes('security') || a.action.includes('alert') ? 'security' as const : 'registration' as const,
   }))
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The NAAC VMS External API uses a fixed-window rate limiting mechanism backed by a PostgreSQL table (`api_integration_rate_limits`) and an atomic `SECURITY DEFINER` function (`api_integration_rate_limit_increment`). This document describes how to maintain, monitor, and clean up the rate limiting system.
+The NA AVN VMS External API uses a fixed-window rate limiting mechanism backed by a PostgreSQL table (`api_integration_rate_limits`) and an atomic `SECURITY DEFINER` function (`api_integration_rate_limit_increment`). This document describes how to maintain, monitor, and clean up the rate limiting system.
 
 ## Architecture
 

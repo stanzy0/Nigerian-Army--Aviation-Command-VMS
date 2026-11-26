@@ -71,6 +71,7 @@ export const PERMISSIONS: Record<UserRole, string[]> = {
     'badges',
     'host',
     'invitations',
+    'audit-logs',
   ],
   Security: [
     'dashboard',

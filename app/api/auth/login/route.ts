@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getClientInfo, logAuthEvent, getUserDisplayName } from '@/lib/server/auth-audit'
 
 // --- Reproduced from @supabase/ssr v0.12.3 (cookie encoding) ---
 
@@ -238,6 +239,18 @@ export async function POST(request: NextRequest) {
     })
 
     if (error || !data.user) {
+      // Log failed login attempt
+      const clientInfo = getClientInfo(request)
+      await logAuthEvent({
+        action: 'login_failed_invalid_credentials',
+        entity_type: 'auth',
+        entity_id: null,
+        performed_by: email,
+        details: `Failed login attempt for email: ${email}`,
+        ip_address: clientInfo.ip_address,
+        user_agent: clientInfo.user_agent,
+      })
+
       console.error('[api/auth/login] signInWithPassword failed:', error?.message ?? 'no user returned')
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 })
     }
@@ -297,20 +310,53 @@ export async function POST(request: NextRequest) {
 
     console.info('[api/auth/login] server-side session confirmed for user:', data.user.id)
 
-    // Role lookup
-    let role: string | null = null
+    // Resolve the authoritative application role from the user_roles table
+    // (the same source used by /api/auth/me and getCurrentUser). Do NOT rely on
+    // auth metadata or the email address, and do not assume a fallback role.
+    let appRole: string | null = null
     let missingRole = false
 
     if (supabaseAdmin) {
-      const { data: userRole } = await supabaseAdmin
+      const { data: userRole, error: roleError } = await supabaseAdmin
         .from('user_roles')
         .select('role')
         .eq('user_id', data.user.id)
         .maybeSingle()
 
-      role = userRole?.role ?? null
-      missingRole = !userRole
+      if (roleError) {
+        console.error('[api/auth/login] user_roles lookup failed:', {
+          userId: data.user.id,
+          message: roleError.message,
+        })
+      } else if (userRole?.role) {
+        appRole = userRole.role
+      } else {
+        missingRole = true
+        console.warn('[api/auth/login] no application role found for authenticated user:', data.user.id)
+      }
+    } else {
+      missingRole = true
+      console.error('[api/auth/login] service role not configured; cannot resolve application role')
     }
+
+    // Log successful login with the actual application role.
+    const clientInfo = getClientInfo(request)
+    const userDisplayName = getUserDisplayName({
+      email: data.user.email,
+      full_name: (data.user.user_metadata?.full_name as string | undefined) ?? null,
+    })
+
+    await logAuthEvent({
+      action: 'login_success',
+      entity_type: 'auth',
+      entity_id: data.user.id,
+      performed_by: userDisplayName,
+      details: `Successful login for ${userDisplayName} (${data.user.email}) with role ${appRole ?? 'Unknown'}`,
+      role: appRole,
+      metadata: missingRole ? { missingRole: true } : undefined,
+      ip_address: clientInfo.ip_address,
+      user_agent: clientInfo.user_agent,
+    })
 
     // Return the response with cookies attached
     return response

@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * NAAC VMS - API Token Revocation Script
+ * NA AVN VMS - API Token Revocation Script
  *
  * Revokes an existing API integration token by setting is_active = false and revoked_at = NOW().
  * Does not physically delete the record.
@@ -59,7 +59,7 @@ function parseArgs(): RevokeTokenOptions | null {
 
 function printHelp(): void {
   console.log(`
-NAAC VMS - API Token Revocation Script
+NA AVN VMS - API Token Revocation Script
 
 Usage:
   npx tsx scripts/revoke-api-token.mts --id <uuid>

@@ -362,7 +362,7 @@ export default function BrandingSettingsPage() {
             onRemove={() => updateField('logo_url', null)}
             accept="image/png,image/jpeg,image/webp"
             path="institution-logo"
-            hint="Logo of the NA Avn Comd"
+            hint="Logo of NA AVN"
           />
 
           <AssetField

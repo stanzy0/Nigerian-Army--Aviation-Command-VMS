@@ -1,6 +1,6 @@
 #!/usr/bin/env npx tsx
 /**
- * NAAC VMS - API Token Issuance Script
+ * NA AVN VMS - API Token Issuance Script
  *
  * Generates a cryptographically secure API token for external integration.
  * The plaintext token is displayed ONLY ONCE. Only the SHA-256 hash is stored.
@@ -74,7 +74,7 @@ function parseArgs(): IssueTokenOptions | null {
 
 function printHelp(): void {
   console.log(`
-NAAC VMS - API Token Issuance Script
+NA AVN VMS - API Token Issuance Script
 
 Usage:
   npx tsx scripts/issue-api-token.mts --name "Integration Name" --scopes "scope1,scope2" [--expires-days 365]

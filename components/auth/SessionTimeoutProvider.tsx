@@ -92,7 +92,15 @@ export function SessionTimeoutProvider({ children }: SessionTimeoutProviderProps
     setLogoutRequested()
 
     try {
+      // Call the logout API endpoint to properly log the logout event
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      })
+
       if (!isDemoMode()) {
+        // We still call signOut to clear the local session, but the actual logout
+        // is handled by the API route which logs the event
         await supabase.auth.signOut()
       }
     } catch {
