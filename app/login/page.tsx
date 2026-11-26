@@ -170,76 +170,57 @@ export default function LoginPage() {
   const collegeName = branding?.college_name || 'Nigerian Army Aviation Command'
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen w-screen overflow-hidden bg-[#0B0F08]">
-      <div className="relative w-full lg:w-1/2 h-[35vh] sm:h-[40vh] lg:h-full flex-shrink-0">
-        <div
-          className="absolute inset-0 z-10"
-          style={{
-            background: 'linear-gradient(180deg, rgba(11,15,8,0.30) 0%, rgba(11,15,8,0.60) 50%, rgba(11,15,8,0.92) 100%)',
-          }}
-        />
-        <img
-          src={loginBg}
-          alt={collegeName}
-          className="absolute inset-0 object-cover"
-        />
-        <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
-          <div className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#C8A646]/50 to-transparent animate-vms-scan-line" />
-        </div>
+    <div
+      className="relative min-h-screen w-full overflow-x-hidden bg-[#0B0F08] bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url(${loginBg})` }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0B0F08]/85 via-[#0B0F08]/55 to-[#0B0F08]/25" />
 
-        <div className="absolute inset-0 z-30 flex items-end">
-          <div className="w-full p-6 sm:p-8 lg:p-10">
-            <div className="flex items-center gap-3 mb-4">
-              <ImageWithFallback
-                src="/images/army logo.png"
-                alt="Nigerian Army Aviation Command Logo"
-                className="h-9 w-9 sm:h-10 sm:w-10 object-contain"
-              />
-            </div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight">
-Nigerian Army Aviation Visitors Management
-            </h1>
-            <p className="text-xs sm:text-sm text-white/80 mt-1 max-w-md">
-              Secure Visitor Registration &amp; Access Management
-            </p>
-            <p className="text-[10px] sm:text-xs text-white/60 mt-1">
+      <Link
+        href="/"
+        aria-label="Back to Home"
+        className="absolute top-4 left-4 sm:top-6 sm:left-6 z-50 inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-[rgba(85,107,47,0.5)] bg-[#10150D]/80 text-[#9A9F87] text-sm font-medium backdrop-blur-sm transition-all duration-200 hover:bg-[#4B5320]/10 hover:border-[#C8A646]/40 hover:text-[#F5F5DC] focus:outline-none focus:ring-2 focus:ring-[#C8A646]/60"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Home
+      </Link>
+
+      <div className="relative z-10 min-h-screen w-full flex items-center justify-center px-4 py-10">
+        <div className="w-[90%] max-w-[420px] rounded-2xl border border-[rgba(85,107,47,0.45)] bg-[#10150D]/85 backdrop-blur-md shadow-2xl p-5 sm:p-6">
+          <div className="flex flex-col items-center text-center">
+            <ImageWithFallback
+              src="/images/army logo.png"
+              alt="Nigerian Army Aviation Command Logo"
+              className="h-14 w-14 object-contain"
+            />
+            <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F5DC]">NA AVN VMS</h1>
+            <p className="mt-1 text-[11px] sm:text-xs font-semibold uppercase tracking-[0.18em] text-[#9A9F87]">
               Nigerian Army Aviation Command
             </p>
+
+            <div className="my-4 h-px w-24 bg-gradient-to-r from-transparent via-[#C8A646]/70 to-transparent" />
+
+            <h2 className="text-lg sm:text-xl font-bold text-[#F5F5DC]">
+              Secure Access. Efficient Visitor Management.
+            </h2>
+            <p className="mt-2 text-sm text-[#9A9F87] max-w-sm">
+              A secure platform for managing and monitoring visitors at Nigerian Army Aviation Command.
+            </p>
           </div>
-        </div>
-      </div>
 
-      <div className="relative w-full lg:w-1/2 flex-1 lg:h-full flex flex-col justify-center px-6 sm:px-8 lg:px-10 xl:px-12 overflow-y-auto bg-[#0B0F08]">
-        <Link
-          href="/"
-          aria-label="Back to Home"
-          className="absolute top-4 left-4 sm:top-6 sm:left-6 z-50 inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-[rgba(85,107,47,0.5)] bg-[#10150D] text-[#9A9F87] text-sm font-medium transition-all duration-200 hover:bg-[#4B5320]/10 hover:border-[#C8A646]/40 hover:text-[#F5F5DC] focus:outline-none focus:ring-2 focus:ring-[#C8A646]/60"
-        >
-          <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-[-2px]" />
-          Back to Home
-        </Link>
-
-        <div className="mx-auto w-full max-w-[420px]">
-          <div className="text-center mb-6">
-            <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 mb-4">
-              <img
-                src="/images/visit.png"
-                alt="Visitor Management illustration"
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <h2 className="text-lg sm:text-xl font-bold text-[#F5F5DC]">Sign in to continue</h2>
-            <p className="text-sm text-[#9A9F87] mt-1">Access the Nigerian Army Aviation Visitors Management System</p>
+          <div className="mt-5">
+            <h3 className="text-base font-semibold text-[#F5F5DC]">Welcome Back</h3>
+            <p className="mt-1 text-sm text-[#9A9F87]">Sign in to access your account.</p>
           </div>
 
           {error && (
-            <div className="mb-5 flex items-start gap-3 rounded-xl border border-[#8B3A3A]/40 bg-[#8B3A3A]/10 p-4" role="alert">
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#8B3A3A]/40 bg-[#8B3A3A]/10 p-4" role="alert">
               <AlertCircle className="h-5 w-5 text-[#f87171] flex-shrink-0 mt-0.5" />
               <p className="text-sm text-[#F5F5DC]">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="mt-4 space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-[#9A9F87] mb-2">
                 Email Address
@@ -312,29 +293,19 @@ Nigerian Army Aviation Visitors Management
               )}
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <input
-                  id="rememberDevice"
-                  type="checkbox"
-                  checked={rememberDevice}
-                  onChange={(e) => setRememberDevice(e.target.checked)}
-                  className="h-4 w-4 rounded border-[rgba(85,107,47,0.35)] focus:ring-2 transition-colors duration-200 bg-[#10150D]"
-                  style={{ color: primaryColor, accentColor: primaryColor }}
-                  aria-label="Remember this device"
-                />
-                <label htmlFor="rememberDevice" className="text-sm text-[#9A9F87] cursor-pointer">
-                  Remember Me
-                </label>
-              </div>
-              <Link
-                href="/forgot-password"
-                className="text-sm transition-colors duration-200 hover:underline"
-                style={{ color: accentColor }}
-                aria-label="Forgot password"
-              >
-                Forgot Password?
-              </Link>
+            <div className="flex items-center gap-2">
+              <input
+                id="rememberDevice"
+                type="checkbox"
+                checked={rememberDevice}
+                onChange={(e) => setRememberDevice(e.target.checked)}
+                className="h-4 w-4 rounded border-[rgba(85,107,47,0.35)] focus:ring-2 transition-colors duration-200 bg-[#10150D]"
+                style={{ color: primaryColor, accentColor: primaryColor }}
+                aria-label="Remember this device"
+              />
+              <label htmlFor="rememberDevice" className="text-sm text-[#9A9F87] cursor-pointer">
+                Remember Me
+              </label>
             </div>
 
             <button
@@ -361,32 +332,10 @@ Nigerian Army Aviation Visitors Management
             </button>
           </form>
 
-          <div className="my-5 flex items-center">
-            <div className="flex-1 border-t border-[rgba(85,107,47,0.35)]" />
-            <span className="px-4 text-xs text-[#9A9F87]">Or</span>
-            <div className="flex-1 border-t border-[rgba(85,107,47,0.35)]" />
-          </div>
-
-          <div className="text-center text-sm text-[#9A9F87]">
-            <p>Need help?</p>
-            <a
-              href="mailto:it-support@afcsc.edu.ng"
-              className="hover:underline transition-colors duration-200"
-              style={{ color: accentColor }}
-              aria-label="Contact system administrator"
-            >
-              Contact the System Administrator
-            </a>
-          </div>
-
-          <div className="mt-5 flex items-center justify-center gap-2">
-            <ShieldCheck className="h-4 w-4 text-[#C8A646]" />
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#9A9F87]">
-              Secure Access Only
-            </span>
-            <span className="relative flex h-2 w-2">
-              <span className="animate-vms-subtle-pulse absolute inline-flex h-full w-full rounded-full bg-[#4B5320] opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#6B8E23]" />
+          <div className="mt-5 flex items-start justify-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-[#C8A646] flex-shrink-0 mt-0.5" />
+            <span className="text-[10px] leading-relaxed text-[#9A9F87]">
+              Authorized personnel only. All access is monitored and recorded.
             </span>
           </div>
         </div>

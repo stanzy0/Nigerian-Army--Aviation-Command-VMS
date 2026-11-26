@@ -34,8 +34,11 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('employees')
-      // Select only fields needed for the Host Employee dropdown
-      .select('id, full_name, department, position, office_location')
+      // Include the editable fields so the Edit form can prepopulate email,
+      // phone, date of birth and photograph (the list table only renders a
+      // subset, so the extra columns are harmless and also serve the host
+      // dropdown).
+      .select('id, full_name, email, phone, department, position, office_location, date_of_birth, birthday_public, photo_url, user_id, created_at')
       .order('created_at', { ascending: false })
 
     if (search) {

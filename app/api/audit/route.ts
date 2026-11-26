@@ -3,6 +3,70 @@ import { getCurrentUser } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isDemoMode } from '@/lib/demo'
 
+const MAX_DETAILS_LENGTH = 2000
+
+export async function POST(request: NextRequest) {
+  // Preserve demo-mode behaviour: never persist audit events in demo mode.
+  if (isDemoMode()) {
+    return NextResponse.json({ success: true, data: null }, { status: 200 })
+  }
+
+  try {
+    // Identity is derived exclusively from the authenticated server-side session.
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!supabaseAdmin) {
+      return NextResponse.json({ success: false, error: 'Service role not configured' }, { status: 500 })
+    }
+
+    // Validate the payload defensively; malformed JSON must not throw.
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
+    }
+
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 })
+    }
+
+    const { action, entityType, entityId, details } = body as Record<string, unknown>
+
+    if (typeof action !== 'string' || action.trim() === '') {
+      return NextResponse.json({ success: false, error: 'action is required' }, { status: 400 })
+    }
+
+    const entityTypeValue =
+      typeof entityType === 'string' && entityType.trim() !== '' ? entityType.trim() : 'user'
+    const entityIdValue = typeof entityId === 'string' && entityId !== '' ? entityId : null
+    const detailsValue =
+      typeof details === 'string' ? details.slice(0, MAX_DETAILS_LENGTH) : ''
+
+    const { error } = await supabaseAdmin.from('audit_logs').insert({
+      action: action.trim(),
+      entity_type: entityTypeValue,
+      entity_id: entityIdValue,
+      // Actor is always the authenticated user — never a client-supplied value.
+      performed_by: user.email || user.id,
+      details: detailsValue,
+    })
+
+    if (error) {
+      console.error('[api/audit] insert failed:', error.message)
+      return NextResponse.json({ success: false, error: 'Failed to record audit event' }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true }, { status: 201 })
+  } catch (err) {
+    console.error('[api/audit] Unexpected error:', err)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 export async function GET(request: NextRequest) {
   if (isDemoMode()) {
     return NextResponse.json({ data: [] })

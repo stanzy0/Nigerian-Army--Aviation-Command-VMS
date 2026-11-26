@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Cake } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Cake, Volume2, VolumeX, Play, Pause } from 'lucide-react'
 import { BirthdayCard } from './BirthdayCard'
 
 interface BirthdayEmployee {
@@ -19,6 +19,11 @@ export function BirthdayCelebration({ refreshIntervalMs = 3600000 }: BirthdayCel
   const [birthdays, setBirthdays] = useState<BirthdayEmployee[]>([])
   const [loading, setLoading] = useState(true)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false)
+  const hasBirthdays = birthdays.length > 0
 
   const fetchBirthdays = useCallback(async () => {
     try {
@@ -56,6 +61,70 @@ export function BirthdayCelebration({ refreshIntervalMs = 3600000 }: BirthdayCel
     const timer = setInterval(fetchBirthdays, refreshIntervalMs)
     return () => clearInterval(timer)
   }, [fetchBirthdays, refreshIntervalMs])
+
+  // Play the birthday song only while a birthday display is shown. A single
+  // audio instance is created per display; switching staff does not recreate it
+  // (hasBirthdays stays true), and cleanup stops/unloads it on close/unmount.
+  useEffect(() => {
+    if (!hasBirthdays) return
+
+    const audio = new Audio('/audio/birthday-song.mp3')
+    audio.volume = 0.5
+    audio.loop = true
+    audio.preload = 'auto'
+    audioRef.current = audio
+    setIsPlaying(false)
+    setIsMuted(false)
+    setAutoplayBlocked(false)
+
+    const onPlay = () => setIsPlaying(true)
+    const onPause = () => setIsPlaying(false)
+    const onEnded = () => setIsPlaying(false)
+    audio.addEventListener('play', onPlay)
+    audio.addEventListener('pause', onPause)
+    audio.addEventListener('ended', onEnded)
+
+    // Attempt autoplay; if the browser blocks it, reveal a manual Play control.
+    const attempt = audio.play()
+    if (attempt && typeof attempt.catch === 'function') {
+      attempt
+        .then(() => setAutoplayBlocked(false))
+        .catch(() => {
+          setIsPlaying(false)
+          setAutoplayBlocked(true)
+        })
+    }
+
+    return () => {
+      audio.removeEventListener('play', onPlay)
+      audio.removeEventListener('pause', onPause)
+      audio.removeEventListener('ended', onEnded)
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      audioRef.current = null
+    }
+  }, [hasBirthdays])
+
+  const handleTogglePlay = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (audio.paused) {
+      audio
+        .play()
+        .then(() => setAutoplayBlocked(false))
+        .catch(() => setAutoplayBlocked(true))
+    } else {
+      audio.pause()
+    }
+  }, [])
+
+  const handleToggleMute = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.muted = !audio.muted
+    setIsMuted(audio.muted)
+  }, [])
 
   if (birthdays.length === 0) return null
 
@@ -95,6 +164,27 @@ export function BirthdayCelebration({ refreshIntervalMs = 3600000 }: BirthdayCel
           <p className="text-base sm:text-lg text-[#C8A646]/90 font-medium">
             Today, we extend our best wishes to our personnel celebrating a birthday{cardCount !== 1 ? 's' : '.'}
           </p>
+
+          {/* Birthday song controls */}
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={handleTogglePlay}
+              aria-label={isPlaying ? 'Pause birthday song' : 'Play birthday song'}
+              className="inline-flex items-center gap-2 h-10 px-4 rounded-full border border-[#C8A646]/40 bg-[rgba(200,166,70,0.12)] text-[#C8A646] text-sm font-medium hover:bg-[rgba(200,166,70,0.2)] transition-colors"
+            >
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              <span>{isPlaying ? 'Pause' : autoplayBlocked ? 'Play Birthday Song' : 'Play'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleMute}
+              aria-label={isMuted ? 'Unmute birthday song' : 'Mute birthday song'}
+              className="inline-flex items-center justify-center h-10 w-10 rounded-full border border-[#C8A646]/40 bg-[rgba(200,166,70,0.12)] text-[#C8A646] hover:bg-[rgba(200,166,70,0.2)] transition-colors"
+            >
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
 
         {/* Employee birthday cards - horizontally centered, balanced layout */}

@@ -142,7 +142,6 @@ export default function EmployeesPage() {
         }
         await updateEmployee(editingEmployee.id, { ...formData, photo_url: photoUrl })
         logAuditAction('Employee Updated', 'employee', editingEmployee.id, `${formData.full_name} updated - ${formData.position} in ${formData.department}`)
-        showNotification('success', 'Employee updated successfully')
       } else {
         const newEmployee = await createEmployee({ ...formData, photo_url: null })
         if (photoFile) {
@@ -152,35 +151,46 @@ export default function EmployeesPage() {
           await updateEmployee(newEmployee.id, { photo_url: photoUrl })
         }
         logAuditAction('Employee Created', 'employee', newEmployee.id, `${formData.full_name} added - ${formData.position} in ${formData.department}`)
-        showNotification('success', 'Employee added successfully')
       }
 
       fetchEmployees()
+      showNotification('success', editingEmployee ? 'Employee updated successfully' : 'Employee added successfully')
+
+      // Reset/close only after a successful save so edits are never lost on error.
+      setSubmitting(false)
+      setModalOpen(false)
+      setEditingEmployee(null)
+      setFormData(initialFormData)
+      setPhotoFile(null)
+      setPhotoPreview(null)
+      setPhotoUploading(false)
     } catch (err) {
       showNotification('error', err instanceof Error ? err.message : 'Failed to save employee')
+      setSubmitting(false)
+      setPhotoUploading(false)
     }
-
-    setSubmitting(false)
-    setModalOpen(false)
-    setEditingEmployee(null)
-    setFormData(initialFormData)
-    setPhotoFile(null)
-    setPhotoPreview(null)
-    setPhotoUploading(false)
   }
 
   const handleEdit = (employee: Employee) => {
     setEditingEmployee(employee)
     setFormData({
-      full_name: employee.full_name,
-      email: employee.email,
-      phone: employee.phone,
-      department: employee.department,
-      position: employee.position,
-      office_location: employee.office_location,
+      full_name: employee.full_name || '',
+      email: employee.email || '',
+      phone: employee.phone || '',
+      department: employee.department || '',
+      position: employee.position || '',
+      office_location: employee.office_location || '',
       date_of_birth: employee.date_of_birth || null,
       birthday_public: employee.birthday_public === true,
       photo_url: employee.photo_url || null,
+      // Resolve the selected ids from the loaded lookups so the comboboxes are
+      // populated in edit mode (the Employee record only carries names).
+      department_id: departments.find((d) => d.name === employee.department)?.id || null,
+      position_id: positions.find((p) => p.title === employee.position)?.id || null,
+      office_location_id:
+        officeLocations.find(
+          (l) => (l.display_name || l.name) === employee.office_location
+        )?.id || null,
     })
     setPhotoFile(null)
     setPhotoPreview(employee.photo_url || null)
