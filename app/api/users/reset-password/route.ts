@@ -1,66 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
-import { supabase } from '@/lib/supabase'
-import { requireAdmin } from '@/lib/auth-helpers'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-function generateTemporaryPassword(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
-  let password = ''
-  for (let i = 0; i < 12; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return password
+// DISABLED: This legacy, insecure password-reset path has been consolidated into
+// the Admin-only endpoint at POST /api/admin/users/reset-password (server-side
+// authorization against public.user_roles, crypto-secure temporary passwords,
+// forced password change, and safe audit logging). It is intentionally inert so
+// no insecure reset path remains reachable.
+export async function POST(_request?: NextRequest) {
+  return NextResponse.json(
+    {
+      success: false,
+      message: 'Password resets must be performed by an administrator.',
+      error: 'Forbidden',
+    },
+    { status: 403 }
+  )
 }
 
-async function logAuditAction(action: string, entityType: string, entityId: string | null, details: string) {
-  try {
-    await supabase.from('audit_logs').insert({
-      action,
-      entity_type: entityType,
-      entity_id: entityId,
-      performed_by: 'admin',
-      details,
-    })
-  } catch (err) {
-    console.error('Failed to log audit action:', err)
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const authResult = await requireAdmin()
-  if (!authResult.authorized) {
-    return NextResponse.json({ success: false, message: authResult.error, error: authResult.error }, { status: authResult.status as never })
-  }
-
-  try {
-    const { userId, email } = await request.json()
-
-    if (!userId) {
-      return NextResponse.json({ success: false, message: '', error: '' }, { status: 400 })
-    }
-
-    const tempPassword = generateTemporaryPassword()
-
-    if (!supabaseAdmin) {
-      return NextResponse.json({ success: false, message: 'Server configuration error', error: 'Service role key not configured' }, { status: 500 })
-    }
-
-    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-      password: tempPassword,
-    })
-
-    if (authError) {
-      return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: 'Internal server error' }, { status: 500 })
-    }
-
-    await logAuditAction('Password Reset', 'user', userId, `Password reset for ${email}`)
-
-    return NextResponse.json({
-      success: true,
-      tempPassword,
-    })
-  } catch (err) {
-    console.error('Reset password error:', err)
-    return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: 'Internal server error' }, { status: 500 })
-  }
+export async function GET(_request?: NextRequest) {
+  return NextResponse.json(
+    {
+      success: false,
+      message: 'Password resets must be performed by an administrator.',
+      error: 'Forbidden',
+    },
+    { status: 403 }
+  )
 }

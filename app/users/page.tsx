@@ -11,7 +11,7 @@ type UserWithHostAssignment = UserWithRole & { user_id: string; host_assignment?
   import { getCiEmployees, getDirectors, getCommanders } from '@/lib/client/employees'
   import type { Employee } from '@/lib/types/employee'
   import SearchableCombobox from '@/components/ui/SearchableCombobox'
-  import { Search, Plus, Edit, Trash2, X, Loader2, Users } from 'lucide-react'
+  import { Search, Plus, Edit, Trash2, X, Loader2, Users, Key } from 'lucide-react'
 
 const inputClasses = "w-full rounded-lg border border-gray-300 bg-[#10150D] px-3 py-2 text-black placeholder:text-[#9A9F87] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
 const searchInputClasses = "pl-9 pr-4 py-2 border border-gray-300 rounded-lg bg-[#10150D] text-black placeholder:text-[#9A9F87] focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
@@ -22,6 +22,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [authChecking, setAuthChecking] = useState(true)
   const [userRole, setUserRole] = useState<UserRole>('Receptionist')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
@@ -32,6 +33,11 @@ export default function UsersPage() {
   const [submitting, setSubmitting] = useState(false)
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [credentials, setCredentials] = useState<{ name: string; email: string; role: string; tempPassword: string; assignedHost?: string } | null>(null)
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserWithHostAssignment | null>(null)
+  const [resetNewPassword, setResetNewPassword] = useState('')
+  const [resetConfirmed, setResetConfirmed] = useState(false)
+  const [resetSubmitting, setResetSubmitting] = useState(false)
+  const [resetResult, setResetResult] = useState<{ email: string; tempPassword: string } | null>(null)
   const [ciEmployees, setCiEmployees] = useState<Employee[]>([])
   const [ciEmployeesLoading, setCiEmployeesLoading] = useState(false)
   const [directors, setDirectors] = useState<Employee[]>([])
@@ -296,6 +302,49 @@ export default function UsersPage() {
     }
   }
 
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!resetPasswordUser) return
+    if (!resetConfirmed) {
+      showNotification('error', 'Please confirm the reset before continuing.')
+      return
+    }
+
+    setResetSubmitting(true)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/admin/users/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          user_id: resetPasswordUser.user_id,
+          ...(resetNewPassword ? { new_password: resetNewPassword } : {}),
+        }),
+      })
+
+      const result = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        throw new Error(result.message || result.error || 'Failed to reset password')
+      }
+
+      const targetEmail = resetPasswordUser.email
+      setResetPasswordUser(null)
+      setResetNewPassword('')
+      setResetConfirmed(false)
+
+      if (result.temporary_password) {
+        setResetResult({ email: targetEmail, tempPassword: result.temporary_password })
+      } else {
+        showNotification('success', 'Password reset successfully')
+      }
+    } catch (err) {
+      showNotification('error', err instanceof Error ? err.message : 'Failed to reset password')
+    } finally {
+      setResetSubmitting(false)
+    }
+  }
+
   async function fetchCiEmployees() {
     setCiEmployeesLoading(true)
     try {
@@ -353,6 +402,7 @@ export default function UsersPage() {
       }
       setAuthChecking(false)
       setUserRole(user.role)
+      setCurrentUserId(user.id)
       fetchUsers()
       setupRealtime()
     }
@@ -503,13 +553,24 @@ export default function UsersPage() {
                                >
                                  <Edit className="h-4 w-4 text-[#9A9F87]" />
                                </button>
-                               <button
-                                 onClick={() => handleDelete(user.user_id)}
-                                 className="p-1 rounded-md hover:bg-red-50 transition-colors"
-                                 aria-label="Delete user"
-                               >
-                                 <Trash2 className="h-4 w-4 text-red-600" />
-                               </button>
+                                <button
+                                  onClick={() => handleDelete(user.user_id)}
+                                  className="p-1 rounded-md hover:bg-red-50 transition-colors"
+                                  aria-label="Delete user"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-600" />
+                                </button>
+                                {userRole === 'Admin' && user.user_id !== currentUserId && (
+                                  <button
+                                    onClick={() => { setResetPasswordUser(user); setResetNewPassword(''); setResetConfirmed(false) }}
+                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[#9A9F87] hover:bg-[#4B5320]/10 hover:text-[#F5F5DC] transition-colors"
+                                    aria-label="Reset password"
+                                    title="Reset Password"
+                                  >
+                                    <Key className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Reset</span>
+                                  </button>
+                                )}
                              </div>
                            </td>
                          </tr>
@@ -750,6 +811,71 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+
+      {resetPasswordUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-[420px] rounded-xl bg-[#10150D] shadow-xl">
+            <div className="flex items-center justify-between border-b border-[rgba(85,107,47,0.35)] p-4">
+              <h2 className="text-lg font-semibold text-[#F5F5DC]">Reset Password</h2>
+              <button onClick={() => { setResetPasswordUser(null); setResetNewPassword(''); setResetConfirmed(false) }} className="p-1 rounded-md hover:bg-gray-100" aria-label="Close">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleResetPassword} className="p-4 space-y-4">
+              <div className="rounded-lg border border-[rgba(85,107,47,0.35)] bg-[#0B0F08] p-3">
+                <p className="text-sm text-[#F5F5DC] font-medium">{resetPasswordUser.full_name || 'Unnamed user'}</p>
+                <p className="text-xs text-[#9A9F87]">{resetPasswordUser.email}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#9A9F87] mb-1">New Password (optional)</label>
+                <input
+                  type="password"
+                  value={resetNewPassword}
+                  onChange={(e) => setResetNewPassword(e.target.value)}
+                  placeholder="Leave blank to auto-generate a secure password"
+                  className={inputClasses}
+                />
+                <p className="mt-1 text-xs text-[#9A9F87]">8+ characters with upper, lower and number. The user must change it after logging in.</p>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-[#9A9F87]">
+                <input type="checkbox" checked={resetConfirmed} onChange={(e) => setResetConfirmed(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                I confirm I want to reset this user&apos;s password.
+              </label>
+              <div className="border-t border-[rgba(85,107,47,0.35)] pt-4 flex justify-end gap-2">
+                <button type="button" onClick={() => { setResetPasswordUser(null); setResetNewPassword(''); setResetConfirmed(false) }} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-[#9A9F87] hover:bg-[#4B5320]/10">Cancel</button>
+                <button type="submit" disabled={resetSubmitting || !resetConfirmed} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                  {resetSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
+                  Reset Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {resetResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-[420px] rounded-xl bg-[#10150D] shadow-xl">
+            <div className="flex items-center justify-between border-b border-[rgba(85,107,47,0.35)] p-4">
+              <h2 className="text-lg font-semibold text-[#F5F5DC]">Temporary Password</h2>
+              <button onClick={() => setResetResult(null)} className="p-1 rounded-md hover:bg-gray-100" aria-label="Close">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-sm text-[#9A9F87]">Reset for <span className="text-[#F5F5DC]">{resetResult.email}</span>. Copy now — shown only once.</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 rounded-lg bg-[#0B0F08] border border-[rgba(85,107,47,0.35)] px-3 py-2 text-sm text-green-300 break-all">{resetResult.tempPassword}</code>
+                <button type="button" onClick={() => navigator.clipboard?.writeText(resetResult.tempPassword)} className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">Copy</button>
+              </div>
+              <p className="text-xs text-amber-400">The user must change this password immediately after logging in.</p>
+              <div className="flex justify-end">
+                <button type="button" onClick={() => setResetResult(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-[#9A9F87] hover:bg-[#4B5320]/10">Done</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

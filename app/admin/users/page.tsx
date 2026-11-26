@@ -43,6 +43,7 @@ export default function AdminUsersPage() {
   const [resetPasswordUser, setResetPasswordUser] = useState<AdminUser | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [resetSubmitting, setResetSubmitting] = useState(false)
+  const [resetResult, setResetResult] = useState<{ email: string; tempPassword: string } | null>(null)
   const [ciEmployees, setCiEmployees] = useState<Employee[]>([])
   const [ciEmployeesLoading, setCiEmployeesLoading] = useState(false)
   const [directors, setDirectors] = useState<Employee[]>([])
@@ -354,21 +355,31 @@ export default function AdminUsersPage() {
         headers.Authorization = `Bearer ${session.access_token}`
       }
 
+      // Empty password => the server generates a secure temporary password.
       const res = await fetch('/api/admin/users/reset-password', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ user_id: resetPasswordUser.user_id, new_password: newPassword }),
+        body: JSON.stringify({
+          user_id: resetPasswordUser.user_id,
+          ...(newPassword ? { new_password: newPassword } : {}),
+        }),
       })
 
       const result = await res.json()
 
       if (!res.ok) {
-        throw new Error(result.error || 'Failed to reset password')
+        throw new Error(result.message || result.error || 'Failed to reset password')
       }
 
-      setNotification({ type: 'success', message: 'Password reset successfully' })
       setResetPasswordUser(null)
       setNewPassword('')
+
+      if (result.temporary_password) {
+        // Show the generated temporary password exactly once.
+        setResetResult({ email: resetPasswordUser.email, tempPassword: result.temporary_password })
+      } else {
+        setNotification({ type: 'success', message: 'Password reset successfully' })
+      }
     } catch (err) {
       setNotification({ type: 'error', message: err instanceof Error ? err.message : 'Failed to reset password' })
     } finally {
@@ -774,15 +785,22 @@ export default function AdminUsersPage() {
               </button>
             </div>
             <form onSubmit={handleResetPassword} className="p-4 space-y-4">
+              <div className="rounded-lg border border-[rgba(85,107,47,0.35)] bg-[#0B0F08] p-3">
+                <p className="text-sm text-[#F5F5DC] font-medium">{resetPasswordUser.full_name || 'Unnamed user'}</p>
+                <p className="text-xs text-[#9A9F87]">{resetPasswordUser.email}</p>
+              </div>
               <div>
-                <label className="block text-sm font-medium text-[#9A9F87] mb-1">New Password *</label>
+                <label className="block text-sm font-medium text-[#9A9F87] mb-1">New Password (optional)</label>
                 <input
                   type="password"
-                  required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Leave blank to auto-generate a secure password"
                   className="w-full rounded-lg border border-gray-300 bg-[#10150D] px-3 py-2 text-sm text-black"
                 />
+                <p className="mt-1 text-xs text-[#9A9F87]">
+                  Must be 8+ characters with upper, lower and number. The user must change it after logging in.
+                </p>
               </div>
               <div className="border-t border-[rgba(85,107,47,0.35)] pt-4 flex justify-end gap-2">
                 <button type="button" onClick={() => { setResetPasswordUser(null); setNewPassword('') }} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-[#9A9F87] hover:bg-[#4B5320]/10">Cancel</button>
@@ -792,6 +810,44 @@ export default function AdminUsersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {resetResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-[420px] rounded-xl bg-[#10150D] shadow-xl">
+            <div className="flex items-center justify-between border-b border-[rgba(85,107,47,0.35)] p-4">
+              <h2 className="text-lg font-semibold text-[#F5F5DC]">Temporary Password</h2>
+              <button onClick={() => setResetResult(null)} className="p-1 rounded-md hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-sm text-[#9A9F87]">
+                Reset for <span className="text-[#F5F5DC]">{resetResult.email}</span>. Copy this password now — it is shown only once.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 rounded-lg bg-[#0B0F08] border border-[rgba(85,107,47,0.35)] px-3 py-2 text-sm text-green-300 break-all">
+                  {resetResult.tempPassword}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard?.writeText(resetResult.tempPassword)}
+                  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Copy
+                </button>
+              </div>
+              <p className="text-xs text-amber-400">
+                The user must change this password immediately after logging in.
+              </p>
+              <div className="flex justify-end">
+                <button type="button" onClick={() => setResetResult(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-[#9A9F87] hover:bg-[#4B5320]/10">
+                  Done
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
