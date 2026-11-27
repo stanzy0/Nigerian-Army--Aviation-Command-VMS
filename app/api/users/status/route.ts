@@ -47,10 +47,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === 'force-password-reset') {
-      await supabaseAdmin
+      const { error: roleFlagError } = await supabaseAdmin
         .from('user_roles')
         .update({ must_change_password: true })
         .eq('user_id', userId)
+
+      if (roleFlagError) {
+        // DB flag is authoritative; fail loudly if it cannot be set.
+        return NextResponse.json({ success: false, message: 'Something went wrong. Please try again.', error: 'Internal server error' }, { status: 500 })
+      }
 
       const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         user_metadata: { must_change_password: true },

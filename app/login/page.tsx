@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { isDemoMode } from '@/lib/demo'
 import { logAuditAction } from '@/lib/client/audit'
 import ImageWithFallback from '@/components/ui/ImageWithFallback'
@@ -10,6 +11,7 @@ import { ShieldCheck, ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react'
 const MAX_FAILED_ATTEMPTS = 6
 
 export default function LoginPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -134,18 +136,26 @@ export default function LoginPage() {
         credentials: 'include',
       })
 
-      // The API returns a JSON response on success - check if it has redirectUrl
-      if (res.ok) {
-        const result = await res.json()
-        if (result.redirectUrl) {
-          console.info('[handleLogin] login successful, redirecting to:', result.redirectUrl)
-          window.location.href = result.redirectUrl
-          return
-        }
+      // Read the response body exactly once.
+      let result: { redirectUrl?: string; error?: string } = {}
+      try {
+        result = await res.json()
+      } catch {
+        result = {}
       }
 
-      // If not redirected, parse error response
-      const result = await res.json()
+      // On success the SSR server client has already written the session
+      // cookie to the response, so it is available on the very next request.
+      // Use client-side navigation (replace + refresh) rather than a cold
+      // full-page reload, which avoids racing the freshly written cookie.
+      if (res.ok && result.redirectUrl) {
+        console.info('[handleLogin] login successful, redirecting to:', result.redirectUrl)
+        router.replace(result.redirectUrl)
+        return
+      }
+
+      setError(result.error || 'Login failed. Please try again.')
+      setLoading(false)
     } catch (err: unknown) {
       // Re-throw NEXT_REDIRECT so Next.js can handle the redirect properly
       if (err && typeof err === 'object' && 'digest' in err && err.digest === 'NEXT_REDIRECT') {

@@ -8,6 +8,7 @@ export type AuditAction =
   | 'login_failed_invalid_credentials'
   | 'login_failed_account_locked'
   | 'password_reset_by_admin'
+  | 'password_changed'
 
 export interface AuditLogEntry {
   action: AuditAction

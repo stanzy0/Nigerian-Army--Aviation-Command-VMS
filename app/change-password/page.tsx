@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { logAuditAction } from '@/lib/client/audit'
 import { Loader2, Lock, CheckCircle2 } from 'lucide-react'
 
 const PASSWORD_MIN_LENGTH = 8
@@ -37,16 +35,39 @@ export default function ChangePasswordPage() {
 
   useEffect(() => {
     const checkFirstLogin = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      try {
+        const res = await fetch('/api/auth/me', {
+          credentials: 'include',
+          cache: 'no-store',
+        })
 
-      if (!user?.user_metadata?.must_change_password) {
-        window.location.href = '/dashboard'
-        return
+        if (res.status === 401) {
+          window.location.href = '/login'
+          return
+        }
+
+        if (!res.ok) {
+          setError('Unable to verify your account. Please try again.')
+          return
+        }
+
+        const { data } = await res.json()
+
+        if (!data || !data.id) {
+          setError('Unable to verify your account. Please try again.')
+          return
+        }
+
+        // Authoritative flag comes from user_roles via /api/auth/me.
+        if (!data.must_change_password) {
+          window.location.href = '/dashboard'
+          return
+        }
+
+        setEmail(data.email || '')
+      } catch {
+        setError('Unable to verify your account. Please try again.')
       }
-
-      setEmail(user.email || '')
     }
     checkFirstLogin()
   }, [])
@@ -78,65 +99,35 @@ export default function ChangePasswordPage() {
     setError(null)
 
     try {
-      const { error: reauthError } = await supabase.auth.signInWithPassword({
-        email,
-        password: currentPassword,
+      // The entire change (verify current password, change password, clear both
+      // flags, audit) happens server-side in one authenticated flow. The client
+      // never mutates the password or the must_change_password flags directly.
+      const completeRes = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
       })
 
-      if (reauthError) {
-        setError('Current password is incorrect')
-        setLoading(false)
+      let completeResult: { redirectUrl?: string; error?: string } = {}
+      try {
+        completeResult = await completeRes.json()
+      } catch {
+        completeResult = {}
+      }
+
+      if (!completeRes.ok || !completeResult.redirectUrl) {
+        setError(completeResult.error || 'Unable to change password. Please try again.')
         return
       }
 
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      })
-
-      if (updateError) {
-        setError(updateError.message)
-        setLoading(false)
-        return
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (user?.id) {
-        await Promise.allSettled([
-          supabase
-            .from('user_roles')
-            .update({ must_change_password: false })
-            .eq('user_id', user.id),
-          supabase.auth.updateUser({
-            data: { must_change_password: false },
-          }),
-          logAuditAction('Password Changed', 'user', user.id, `Password changed for ${user.email}`),
-        ])
-      }
-
-      if (user?.id) {
-        const { data: userRole } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single()
-
-        const role = userRole?.role
-        let redirectUrl = '/dashboard'
-        if (role === 'PA_TO_CI') redirectUrl = '/pa-ci'
-        else if (role === 'PA_TO_DIRECTOR') redirectUrl = '/pa-director'
-        else if (role === 'Security') redirectUrl = '/security'
-        else if (role === 'Host Employee') redirectUrl = '/host'
-
-        setSuccess(true)
-        setTimeout(() => {
-          window.location.href = redirectUrl
-        }, 2000)
-      } else {
-        setError('Unable to verify user session. Please log in again.')
-      }
+      setSuccess(true)
+      setTimeout(() => {
+        window.location.href = completeResult.redirectUrl as string
+      }, 2000)
     } catch {
       setError('An unexpected error occurred. Please try again.')
     } finally {

@@ -89,8 +89,13 @@ export async function POST(request: NextRequest) {
       .eq('user_id', userId)
 
     if (roleUpdateError) {
-      // Non-fatal: the auth metadata already forces the change. Log server-side.
+      // The DB flag is authoritative for enforcement; if it cannot be set the
+      // reset must fail loudly rather than silently rely on metadata alone.
       console.error('[admin/reset-password] user_roles must_change_password update failed:', roleUpdateError.message)
+      return NextResponse.json(
+        { success: false, message: 'Something went wrong. Please try again.', error: 'Internal server error' },
+        { status: 500 }
+      )
     }
 
     // Audit: never include the password. Identify admin + target only.

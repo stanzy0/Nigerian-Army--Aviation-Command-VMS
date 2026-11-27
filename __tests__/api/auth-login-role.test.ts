@@ -7,8 +7,8 @@ const mockSignIn = vi.hoisted(() => vi.fn());
 const mockFrom = vi.hoisted(() => vi.fn());
 const mockLogAuthEvent = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({ auth: { signInWithPassword: mockSignIn } }),
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: async () => ({ auth: { signInWithPassword: mockSignIn } }),
 }));
 
 vi.mock('@/lib/supabase-admin', () => ({
@@ -91,7 +91,10 @@ describe('POST /api/auth/login role resolution', () => {
     mockUserRole(null);
 
     const res = await login(makeLoginRequest('norole@army.mil.ng'));
-    expect(res.status).toBe(200); // auth behaviour preserved
+    expect(res.status).toBe(403); // secure: no role, no redirect
+    const body = await res.json();
+    expect(body.error).toContain('assigned role');
+    expect(body.redirectUrl).toBeUndefined();
 
     const event = mockLogAuthEvent.mock.calls.find((c) => c[0].action === 'login_success')[0];
     expect(event.role).toBeNull();

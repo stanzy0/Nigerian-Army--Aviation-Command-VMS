@@ -40,11 +40,41 @@ export async function updateSession(request: NextRequest) {
     })
 
     const { data: { user } } = await supabase.auth.getUser()
-    const mustChangePassword = Boolean(user?.user_metadata?.must_change_password)
     const pathname = request.nextUrl.pathname
     const isChangePasswordPage = pathname === '/change-password'
     const isLoginPage = pathname === '/login'
     const isApiRoute = pathname.startsWith('/api/')
+
+    // Password-change enforcement uses the authoritative user_roles flag,
+    // read through the same authenticated SSR client (RLS permits a user to
+    // select their own row: auth.uid() = user_id). No service-role key is used.
+    // The auth-metadata flag is a fallback only when no user_roles row exists,
+    // so a stale metadata mirror cannot re-force a user who already changed
+    // their password (DB flag cleared).
+    let mustChangePassword = Boolean(user?.user_metadata?.must_change_password)
+    let roleFound = false
+    if (user) {
+      const { data: roleRow } = await supabase
+        .from('user_roles')
+        .select('must_change_password')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      roleFound = Boolean(roleRow)
+      if (roleRow) {
+        mustChangePassword = Boolean(roleRow.must_change_password)
+      }
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      // Development-only diagnostic. Booleans/path only — no PII.
+      console.info(
+        '[dev][middleware] path=%s authed=%s roleFound=%s mustChangePassword=%s',
+        pathname,
+        Boolean(user),
+        roleFound,
+        mustChangePassword
+      )
+    }
 
     if (mustChangePassword && !isChangePasswordPage && !isLoginPage && !isApiRoute) {
       return NextResponse.redirect(new URL('/change-password', request.url))
