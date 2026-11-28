@@ -340,6 +340,11 @@ export default function LoginPage() {
                 'Sign In'
               )}
             </button>
+            <p className="mt-4 text-sm text-center">
+              <a href="/forgot-password" className="text-[#C8A646] hover:text-[#C8A646]/80 transition-colors">
+                Forgot your password?
+              </a>
+            </p>
           </form>
 
           <div className="mt-5 flex items-start justify-center gap-2">
